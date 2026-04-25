@@ -35,6 +35,23 @@ body {
   font-family: "Segoe UI", sans-serif;
 }
 
+body,
+input,
+button {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input {
+  font: inherit;
+}
+
 .mission-app {
   width: min(1380px, calc(100vw - 28px));
   margin: 0 auto;
@@ -220,6 +237,10 @@ body {
   gap: 18px;
 }
 
+.content-grid.single-column {
+  grid-template-columns: 1fr;
+}
+
 .primary-column,
 .secondary-column {
   display: flex;
@@ -351,39 +372,54 @@ body {
   border: 1px solid rgba(92, 74, 46, 0.09);
 }
 
+.command-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .prompt-line {
   margin: 0 0 14px;
   color: #344256;
 }
 
-.command-input {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+.command-text-input {
+  flex: 1;
+  min-width: 0;
   border-radius: 14px;
   padding: 14px 16px;
   background: #fffdf8;
   border: 1px solid rgba(92, 74, 46, 0.11);
+  color: var(--ink);
 }
 
-.command-input span {
-  color: var(--muted);
+.command-text-input:focus {
+  outline: 2px solid rgba(15, 94, 82, 0.2);
+  border-color: rgba(15, 94, 82, 0.45);
 }
 
-.command-input button,
+.command-form button,
 .quick-action {
   appearance: none;
   border: 0;
   cursor: pointer;
 }
 
-.command-input button {
+.command-form button {
   border-radius: 999px;
   padding: 10px 16px;
   background: linear-gradient(135deg, var(--accent-deep), var(--accent));
   color: #f5faf9;
   font-weight: 700;
+}
+
+.command-feedback {
+  margin: 14px 2px 0;
+  color: #233145;
+}
+
+.command-feedback.muted {
+  color: var(--muted);
 }
 
 .quick-action-list {
@@ -409,11 +445,132 @@ body {
   color: var(--muted);
 }
 
+.approval-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.approval-actions button {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, var(--accent-deep), var(--accent));
+  color: #f5faf9;
+  font-weight: 700;
+}
+
+.approval-actions button.secondary {
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--ink);
+  border: 1px solid rgba(92, 74, 46, 0.11);
+}
+
+.thread-layout {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 12px;
+}
+
+.thread-card.selectable {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+}
+
+.thread-card.selected {
+  border-color: rgba(15, 94, 82, 0.35);
+  background: linear-gradient(180deg, rgba(236, 250, 246, 0.95), rgba(248, 253, 251, 0.96));
+}
+
+.thread-detail {
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(92, 74, 46, 0.09);
+}
+
+.thread-detail h3 {
+  margin: 10px 0 8px;
+}
+
+.thread-meta {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.empty-state-card {
+  border-radius: 18px;
+  padding: 24px 20px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px dashed rgba(92, 74, 46, 0.18);
+}
+
+.empty-state-card p {
+  margin: 0;
+  color: #344256;
+  line-height: 1.7;
+}
+
+.empty-state-card span {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--muted);
+}
+
+.empty-state-card.compact {
+  padding: 16px;
+}
+
+.loading-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.loading-card {
+  width: min(560px, 100%);
+  border-radius: 28px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.loading-card h1 {
+  margin: 10px 0 12px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 0.98;
+}
+
+.loading-card p:not(.eyebrow) {
+  margin: 0;
+  color: #344256;
+  line-height: 1.7;
+}
+
+.not-found-link {
+  display: inline-flex;
+  margin-top: 18px;
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, var(--accent-deep), var(--accent));
+  color: #f5faf9;
+  font-weight: 700;
+}
+
 @media (max-width: 1120px) {
   .mission-app,
   .hero-banner,
   .content-grid,
-  .pulse-grid {
+  .pulse-grid,
+  .thread-layout {
     grid-template-columns: 1fr;
   }
 
@@ -446,6 +603,11 @@ body {
 
   .agenda-item {
     grid-template-columns: 1fr;
+  }
+
+  .command-form {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .hero-banner h2 {
