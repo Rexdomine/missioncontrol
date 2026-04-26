@@ -4,7 +4,7 @@ export default function Loading() {
       <div className="loading-card">
         <p className="eyebrow">Mission Control</p>
         <h1>Loading workspace</h1>
-        <p>Preparing the Phase 1 dashboard and route state.</p>
+        <p>Preparing the active workspace, connected modules, and route state.</p>
       </div>
     </main>
   );

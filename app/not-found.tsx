@@ -7,8 +7,8 @@ export default function NotFound() {
         <p className="eyebrow">Mission Control</p>
         <h1>Route not found</h1>
         <p>
-          That surface does not exist in Phase 1. Return to the dashboard and keep
-          the app state grounded.
+          That surface does not exist in the current workspace. Return to the
+          dashboard and keep the app state grounded.
         </p>
         <Link className="not-found-link" href="/">
           Back to dashboard

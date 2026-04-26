@@ -1,26 +1,31 @@
-import { EmptyModuleState, MissionControlLayout, PageHero } from "@/components/mission-control-layout";
+import { Suspense } from "react";
+import {
+  projectBoardLanes,
+  projectPortfolio,
+  projectWaitingItems,
+} from "@/components/mission-control-data";
+import { MissionControlLayout, PageHero } from "@/components/mission-control-layout";
+import { ProjectsOperationsModule } from "@/components/mission-control-phase-two";
 
 export default function ProjectsPage() {
   return (
     <MissionControlLayout
       hero={
         <PageHero
-          copy="The project module is intentionally routed now so Phase 1 has a complete information architecture and clear extension path."
+          copy="Projects now operate as a real execution surface: the board keeps active work visible, the detail rail keeps next actions explicit, and external dependencies stay impossible to ignore."
           eyebrow="Projects"
           metrics={[
-            { label: "Module state", value: "Queued" },
-            { label: "Next phase", value: "Phase 2" },
-            { label: "Design status", value: "Planned" },
+            { label: "Live projects", value: String(projectPortfolio.length) },
+            { label: "Board lanes", value: String(projectBoardLanes.length) },
+            { label: "Waiting on", value: String(projectWaitingItems.length) },
           ]}
-          title="Project execution lands in Phase 2."
+          title="Active work, blockers, and next moves in one board."
         />
       }
     >
-      <EmptyModuleState
-        action="Next: wire board view, project details, and next-action rails."
-        body="Projects will become the execution home for active work, blockers, and ownership once the Today cockpit is fully verified."
-        title="Project board is intentionally staged for the next phase."
-      />
+      <Suspense fallback={null}>
+        <ProjectsOperationsModule />
+      </Suspense>
     </MissionControlLayout>
   );
 }

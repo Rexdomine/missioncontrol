@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type {
   AgendaItem,
@@ -41,11 +42,23 @@ export function FocusSection({ items }: { items: FocusItem[] }) {
       <div className="focus-stack">
         {items.map((item) => (
           <div className="focus-card" key={item.id}>
-            <div className="focus-topline">
-              <h3>{item.title}</h3>
-              <span>{item.tag}</span>
-            </div>
-            <p>{item.detail}</p>
+            {item.href ? (
+              <Link className="card-link" href={item.href}>
+                <div className="focus-topline">
+                  <h3>{item.title}</h3>
+                  <span>{item.tag}</span>
+                </div>
+                <p>{item.detail}</p>
+              </Link>
+            ) : (
+              <>
+                <div className="focus-topline">
+                  <h3>{item.title}</h3>
+                  <span>{item.tag}</span>
+                </div>
+                <p>{item.detail}</p>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -64,11 +77,23 @@ export function AgendaSection({ items }: { items: AgendaItem[] }) {
       <div className="agenda-list">
         {items.map((item) => (
           <div className="agenda-item" key={item.id}>
-            <time>{item.time}</time>
-            <div>
-              <h3>{item.title}</h3>
-              <p>{item.note}</p>
-            </div>
+            {item.href ? (
+              <Link className="agenda-link" href={item.href}>
+                <time>{item.time}</time>
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>{item.note}</p>
+                </div>
+              </Link>
+            ) : (
+              <>
+                <time>{item.time}</time>
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>{item.note}</p>
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -91,11 +116,23 @@ export function ProjectPulseSection({
       <div className="pulse-grid">
         {projects.map((project) => (
           <div className="pulse-card" key={project.id}>
-            <div className="pulse-topline">
-              <h3>{project.name}</h3>
-              <span>{project.status}</span>
-            </div>
-            <p>{project.next}</p>
+            {project.href ? (
+              <Link className="card-link" href={project.href}>
+                <div className="pulse-topline">
+                  <h3>{project.name}</h3>
+                  <span>{project.status}</span>
+                </div>
+                <p>{project.next}</p>
+              </Link>
+            ) : (
+              <>
+                <div className="pulse-topline">
+                  <h3>{project.name}</h3>
+                  <span>{project.status}</span>
+                </div>
+                <p>{project.next}</p>
+              </>
+            )}
           </div>
         ))}
       </div>

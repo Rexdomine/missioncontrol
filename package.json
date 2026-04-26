@@ -3,11 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "predev": "node scripts/prepare-next-runtime.mjs",
+    "dev": "NODE_ENV=development next dev --hostname 127.0.0.1 --port 3000",
+    "predev:lan": "node scripts/prepare-next-runtime.mjs",
+    "dev:lan": "NODE_ENV=development next dev --hostname 0.0.0.0 --port 3000",
+    "preview:tunnel": "node scripts/preview-tunnel.mjs",
+    "preview:secure": "node scripts/preview-tunnel.mjs",
+    "prebuild": "node scripts/prepare-next-runtime.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "typegen": "next typegen",
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
