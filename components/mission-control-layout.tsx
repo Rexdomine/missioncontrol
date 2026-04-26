@@ -47,7 +47,7 @@ export function MissionControlLayout({
           </div>
           <div className="status-card">
             <strong>StarLord</strong>
-            <span>Phase 1 production pass active</span>
+            <span>Phase 2 operations pass active</span>
           </div>
         </div>
       </aside>
