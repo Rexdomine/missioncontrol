@@ -1531,3 +1531,223 @@ input {
     grid-template-columns: 1fr;
   }
 }
+
+.orchestration-grid {
+  align-items: start;
+}
+
+.orchestration-command-panel,
+.central-timeline-panel,
+.recommendation-tray-panel {
+  background:
+    radial-gradient(circle at top right, rgba(15, 94, 82, 0.11), transparent 28%),
+    var(--panel);
+}
+
+.orchestration-search-box {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(92, 74, 46, 0.09);
+}
+
+.orchestration-search-box input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: #fffdf8;
+  color: var(--ink);
+}
+
+.orchestration-search-box button {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, var(--accent-deep), var(--accent));
+  color: #f5faf9;
+  font-weight: 800;
+}
+
+.search-result-grid,
+.workflow-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.search-result-card,
+.workflow-launch-card,
+.recommendation-card,
+.memory-summary-card,
+.assistant-context-card,
+.selected-workflow-panel {
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(92, 74, 46, 0.09);
+}
+
+.search-result-card h3,
+.workflow-launch-card h3,
+.recommendation-card h3,
+.memory-summary-card h3,
+.assistant-context-card h3,
+.selected-workflow-panel h3,
+.central-timeline-item h3 {
+  margin: 5px 0 0;
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.search-result-card p:not(.project-priority),
+.workflow-launch-card p,
+.recommendation-card p,
+.memory-summary-card p,
+.assistant-context-card p,
+.central-timeline-item p,
+.selected-workflow-panel h3 {
+  color: #344256;
+  line-height: 1.6;
+}
+
+.search-result-card p:not(.project-priority),
+.workflow-launch-card p,
+.recommendation-card p,
+.memory-summary-card p,
+.assistant-context-card p,
+.central-timeline-item p {
+  margin: 10px 0 0;
+}
+
+.central-timeline,
+.recommendation-list,
+.memory-summary-list,
+.assistant-panel-list,
+.workflow-step-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.central-timeline-item {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 14px;
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(92, 74, 46, 0.09);
+}
+
+.central-timeline-item time {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: start;
+  min-height: 42px;
+  border-radius: 14px;
+  background: var(--gold-soft);
+  color: #6a4309;
+  font-weight: 900;
+  text-align: center;
+}
+
+.workflow-launch-card {
+  appearance: none;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+
+.workflow-launch-card.selected,
+.search-result-card:hover,
+.central-timeline-item:hover {
+  border-color: rgba(15, 94, 82, 0.32);
+  box-shadow: 0 12px 34px rgba(15, 94, 82, 0.08);
+}
+
+.workflow-launch-card span:not(.status-pill) {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.selected-workflow-panel {
+  margin-top: 14px;
+  background: linear-gradient(180deg, rgba(241, 250, 247, 0.96), rgba(255, 250, 242, 0.94));
+}
+
+.workflow-step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(92, 74, 46, 0.08);
+}
+
+.workflow-step span:first-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 900;
+}
+
+.workflow-step em {
+  font-style: normal;
+}
+
+.recommendation-card strong,
+.memory-summary-card strong,
+.assistant-context-card strong {
+  display: block;
+  margin-top: 10px;
+  color: #223247;
+  line-height: 1.5;
+}
+
+.source-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.source-chip-row span {
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+@media (max-width: 1120px) {
+  .search-result-grid,
+  .workflow-card-grid,
+  .central-timeline-item,
+  .workflow-step {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .orchestration-search-box {
+    flex-direction: column;
+  }
+}
