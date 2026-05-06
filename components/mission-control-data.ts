@@ -6,6 +6,7 @@ export type ModuleKey =
   | "job-hunt"
   | "content"
   | "approvals"
+  | "orchestration"
   | "chat";
 
 export interface SidebarItem {
@@ -308,6 +309,61 @@ export interface SeverityAlert {
   remediation: string;
 }
 
+
+export interface OrchestrationTimelineItem {
+  id: string;
+  time: string;
+  module: "Agent OS" | "Projects" | "Calendar" | "Job Hunt" | "Content" | "Approvals";
+  title: string;
+  summary: string;
+  signal: "Decision" | "Risk" | "Next action" | "Memory";
+  relatedHref: string;
+}
+
+export interface RecommendationItem {
+  id: string;
+  priority: "P1" | "P2" | "P3";
+  title: string;
+  why: string;
+  action: string;
+  sourceModules: string[];
+}
+
+export interface UnifiedSearchItem {
+  id: string;
+  label: string;
+  module: ModuleKey;
+  href: string;
+  keywords: string[];
+  summary: string;
+}
+
+export interface MemoryAwareSummary {
+  id: string;
+  title: string;
+  source: string;
+  summary: string;
+  confidence: "High" | "Medium";
+  nextUse: string;
+}
+
+export interface MultiStepWorkflow {
+  id: string;
+  title: string;
+  initiatedFrom: "Chat" | "Card";
+  objective: string;
+  steps: Array<{ label: string; state: "Ready" | "Needs approval" | "Blocked" }>;
+  launchPrompt: string;
+}
+
+export interface ContextualAssistantPanel {
+  id: string;
+  module: ModuleKey;
+  title: string;
+  guidance: string;
+  suggestedPrompt: string;
+}
+
 export const sidebarItems: SidebarItem[] = [
   { key: "today", label: "Today", href: "/", status: "live" },
   { key: "agent-os", label: "Agent OS", href: "/agent-os", status: "live" },
@@ -316,6 +372,7 @@ export const sidebarItems: SidebarItem[] = [
   { key: "job-hunt", label: "Job Hunt", href: "/job-hunt", status: "live" },
   { key: "content", label: "Content", href: "/content", status: "live" },
   { key: "approvals", label: "Approvals", href: "/approvals", status: "live" },
+  { key: "orchestration", label: "Orchestration", href: "/orchestration", status: "live" },
   { key: "chat", label: "Chat", href: "/chat", status: "live" },
 ];
 
@@ -326,9 +383,9 @@ export const agentStatuses: AgentStatus[] = [
     role: "Primary orchestrator",
     state: "Executing",
     project: "Mission Control",
-    currentTask: "Build Agent OS Phase 4 so approvals, alerts, automation history, and workflow health are actionable.",
-    lastAction: "Confirmed Phase 3 PR #4 is merged into `main` and started Phase 4 from the fresh baseline.",
-    nextAction: "Verify the workflow-health module, then publish a fresh Phase 4 PR.",
+    currentTask: "Build Agent OS Phase 5 so Mission Control becomes an intelligent orchestration layer.",
+    lastAction: "Confirmed Phase 4 PR #5 is open and started stacked Phase 5 from `thor/agent-os-phase4`.",
+    nextAction: "Verify the orchestration layer, then publish a fresh stacked Phase 5 PR.",
     risk: "Low",
     telemetry: [
       { label: "Mode", value: "Repo execution" },
@@ -342,12 +399,12 @@ export const agentStatuses: AgentStatus[] = [
     role: "Senior full-stack delivery lane",
     state: "Executing",
     project: "Mission Control",
-    currentTask: "Implement Phase 4 from clean `origin/main` on `thor/agent-os-phase4`.",
-    lastAction: "Created the Phase 4 branch after Phase 3 merged into main.",
-    nextAction: "Run lint, typecheck, build, smoke, push, and open the Phase 4 PR.",
+    currentTask: "Implement Phase 5 from stacked `thor/agent-os-phase4` on `thor/agent-os-phase5`.",
+    lastAction: "Created the Phase 5 branch from open Phase 4 because the orchestration layer depends on workflow health.",
+    nextAction: "Run lint, typecheck, build, smoke, push, and open the stacked Phase 5 PR.",
     risk: "Medium",
     telemetry: [
-      { label: "Branch", value: "thor/agent-os-phase4" },
+      { label: "Branch", value: "thor/agent-os-phase5" },
       { label: "Base", value: "origin/main" },
       { label: "Deploy", value: "Vercel preview" },
     ],
@@ -373,17 +430,17 @@ export const agentStatuses: AgentStatus[] = [
 export const operatingTasks: OperatingTask[] = [
   {
     id: "task-mission-control-agent-os",
-    title: "Mission Control Agent OS Phase 4",
+    title: "Mission Control Agent OS Phase 5",
     owner: "Thor",
     lane: "Active",
     project: "Mission Control",
     summary:
-      "Expose approvals, alerts, automation history, and connector health so workflow failures are diagnosable in one place.",
+      "Add cross-module timeline, recommendations, unified search, memory-aware summaries, and guided workflows.",
     blocker: "None. Fresh PR required before handoff.",
-    nextAction: "Verify Phase 4 modules and publish a fresh PR for review.",
+    nextAction: "Verify Phase 5 orchestration and publish a fresh stacked PR for review.",
     evidence: [
-      "Branch cut from merged Phase 3 `origin/main`",
-      "Approvals route upgraded into workflow-health diagnostics",
+      "Branch stacked from open Phase 4 `thor/agent-os-phase4`",
+      "Orchestration route connects modules, memory, and guided workflows",
       "PR gate remains mandatory before handoff",
     ],
   },
@@ -521,7 +578,7 @@ export const continuityRecords: ContinuityRecord[] = [
     id: "continuity-active-lane",
     label: "Active lane",
     source: "Current request",
-    state: "Mission Control Agent OS Phase 4",
+    state: "Mission Control Agent OS Phase 5",
     next: "Make Job Hunt and Content pipelines live, actionable modules.",
   },
   {
@@ -627,7 +684,7 @@ export const commandRunbooks: CommandRunbook[] = [
 export const dispatchQueue: DispatchQueueItem[] = [
   {
     id: "dispatch-agent-os-phase2",
-    title: "Mission Control Agent OS Phase 4",
+    title: "Mission Control Agent OS Phase 5",
     agent: "Thor",
     priority: "P1",
     readiness: "Ready",
@@ -659,7 +716,7 @@ export const publicationPipeline: PublicationPipelineItem[] = [
     id: "pipeline-scope",
     label: "Scope",
     status: "Done",
-    detail: "Phase 4 is limited to workflow-health visibility: approvals, alerts, automation history, and connector diagnostics.",
+    detail: "Phase 5 is limited to orchestration UI: timeline, recommendations, search, memory summaries, and staged workflows.",
   },
   {
     id: "pipeline-verify",
@@ -671,7 +728,7 @@ export const publicationPipeline: PublicationPipelineItem[] = [
     id: "pipeline-pr",
     label: "Publish",
     status: "Next",
-    detail: "Push `thor/agent-os-phase4` and open a PR against `main` for Vercel preview testing.",
+    detail: "Push `thor/agent-os-phase5` and open a stacked PR against `thor/agent-os-phase4` for review.",
   },
 ];
 
@@ -688,7 +745,7 @@ export const focusItems: FocusItem[] = [
     id: "focus-agent-os",
     title: "Mission Control Agent OS",
     detail:
-      "Ship approvals, alerts, automation history, and workflow health so silent failures become diagnosable.",
+      "Ship the intelligent orchestration layer so StarLord can guide action across modules.",
     tag: "In Build",
     href: "/agent-os",
   },
@@ -1334,6 +1391,46 @@ export const productionStages: ProductionStage[] = [
   },
 ];
 
+export const orchestrationTimeline: OrchestrationTimelineItem[] = [
+  { id: "orch-phase5", time: "Now", module: "Agent OS", title: "Phase 5 orchestration layer in build", summary: "Agent OS cockpit is moving from dashboards into guided action with recommendations and multi-step workflows.", signal: "Decision", relatedHref: "/agent-os" },
+  { id: "orch-approval-health", time: "08:03", module: "Approvals", title: "Role hunt connector degraded", summary: "Workflow health flagged Tavily auth drift and attached remediation before the next weekday automation run.", signal: "Risk", relatedHref: "/approvals" },
+  { id: "orch-calendar-gallery", time: "Today", module: "Calendar", title: "Birthday content planning needs gallery lock", summary: "Calendar prep and content pipeline both point to confirming Moeshen Art Gallery access before May 8.", signal: "Next action", relatedHref: "/calendar" },
+  { id: "orch-nimet-memory", time: "Paused", module: "Projects", title: "NiMet deploy remains blocked", summary: "Memory-backed continuity keeps the VPS disk-full blocker visible without restarting production work prematurely.", signal: "Memory", relatedHref: "/projects?project=nimet-oneportal" },
+  { id: "orch-job-content", time: "Weekly", module: "Job Hunt", title: "Role hunt output can fuel content angle", summary: "Remote-role positioning insights should feed a content asset after the weekly shortlist review.", signal: "Next action", relatedHref: "/job-hunt" },
+];
+
+export const recommendationItems: RecommendationItem[] = [
+  { id: "rec-gallery", priority: "P1", title: "Confirm birthday content shoot access", why: "Projects, Calendar, and Content all reference the May 8 deadline, so this is the highest cross-module unblock.", action: "Open the gallery prep workflow and draft the booking message.", sourceModules: ["Projects", "Calendar", "Content"] },
+  { id: "rec-role-connector", priority: "P2", title: "Repair role-hunt search connector before next cron", why: "Phase 4 health shows degraded Tavily auth; the next weekday run will repeat the fallback unless credentials are ready.", action: "Stage connector readiness check from Workflow Health.", sourceModules: ["Approvals", "Job Hunt", "Agent OS"] },
+  { id: "rec-nimet-pause", priority: "P3", title: "Keep NiMet paused, but preserve resume path", why: "Memory says the production blocker is environmental, not a code issue. Surfacing it prevents false green status.", action: "Leave blocked until Rex explicitly resumes disk cleanup.", sourceModules: ["Projects", "Memory", "Agent OS"] },
+];
+
+export const unifiedSearchItems: UnifiedSearchItem[] = [
+  { id: "search-workflow-health", label: "Workflow health", module: "approvals", href: "/approvals", keywords: ["approvals", "alerts", "connector", "cron"], summary: "Alert severity, run history, approval anomalies, and connector health." },
+  { id: "search-agent-os", label: "Agent OS cockpit", module: "agent-os", href: "/agent-os", keywords: ["agents", "tasks", "skills", "orchestration"], summary: "Execution controls, continuity, gates, and Phase 5 entry point." },
+  { id: "search-gallery", label: "Birthday content shoot", module: "projects", href: "/projects?project=birthday-content", keywords: ["gallery", "birthday", "content", "May 8"], summary: "Project and content prep for the gallery shoot." },
+  { id: "search-role-hunt", label: "Remote role hunt", module: "job-hunt", href: "/job-hunt", keywords: ["jobs", "roles", "shortlist", "Tavily"], summary: "Daily/weekly role-search outputs and application pipeline." },
+  { id: "search-command", label: "Command StarLord", module: "chat", href: "/chat", keywords: ["chat", "command", "workflow", "prompt"], summary: "Staged command surface for launching multi-step workflows." },
+];
+
+export const memoryAwareSummaries: MemoryAwareSummary[] = [
+  { id: "memory-active-lane", title: "Active lane", source: "Current assignment + PR state", summary: "Phase 5 is stacked on open Phase 4 because orchestration depends on workflow-health surfaces.", confidence: "High", nextUse: "Use as PR base and cockpit status." },
+  { id: "memory-nimet", title: "Paused production blocker", source: "memory/tasks.md", summary: "NiMet Lexical code is merged, but deployment waits on VPS disk cleanup and redeploy verification.", confidence: "High", nextUse: "Recommend pause, not code churn." },
+  { id: "memory-role-hunt", title: "Recurring automation caveat", source: "Workflow health + tool memory", summary: "Role hunt automation is useful, but connector auth drift must be visible before the next weekday run.", confidence: "Medium", nextUse: "Guide connector readiness recommendation." },
+];
+
+export const multiStepWorkflows: MultiStepWorkflow[] = [
+  { id: "workflow-gallery", title: "Prepare gallery booking", initiatedFrom: "Card", objective: "Turn project, calendar, and content context into a booking message and shoot checklist.", steps: [{ label: "Review calendar prep window", state: "Ready" }, { label: "Draft gallery access message", state: "Ready" }, { label: "Ask Rex before sending", state: "Needs approval" }], launchPrompt: "StarLord, prepare the gallery booking workflow with message draft and checklist." },
+  { id: "workflow-connector", title: "Repair role-hunt connector", initiatedFrom: "Card", objective: "Diagnose Tavily readiness before the next weekday job-search automation.", steps: [{ label: "Open workflow-health anomaly", state: "Ready" }, { label: "Check connector credentials", state: "Needs approval" }, { label: "Run next cron smoke", state: "Blocked" }], launchPrompt: "StarLord, stage the role-hunt connector readiness workflow." },
+  { id: "workflow-weekly-review", title: "Weekly operating review", initiatedFrom: "Chat", objective: "Summarize projects, jobs, content, approvals, and calendar into one action plan.", steps: [{ label: "Collect module summaries", state: "Ready" }, { label: "Rank recommendations", state: "Ready" }, { label: "Create action plan", state: "Ready" }], launchPrompt: "StarLord, run my weekly operating review from all modules." },
+];
+
+export const contextualAssistantPanels: ContextualAssistantPanel[] = [
+  { id: "assistant-agent-os", module: "agent-os", title: "Agent OS guidance", guidance: "Use the cockpit to decide whether a task needs execution, monitoring, or memory continuity before opening a module.", suggestedPrompt: "What should move next across agents, projects, and workflow health?" },
+  { id: "assistant-approvals", module: "approvals", title: "Workflow health guidance", guidance: "Treat alerts as source-linked diagnostics: resolve connector failures before escalating stale approval noise.", suggestedPrompt: "Explain which workflow health issue will become friction first." },
+  { id: "assistant-content", module: "content", title: "Content guidance", guidance: "Connect content assets to calendar commitments so birthday shoot planning turns into published output.", suggestedPrompt: "Build the next content action from calendar and project context." },
+];
+
 export const automationRunHistory: AutomationRunHistoryItem[] = [
   {
     id: "run-role-hunt-0600",
@@ -1557,6 +1654,7 @@ export const quickActions = [
 export function getActiveModule(pathname: string): ModuleKey {
   if (pathname === "/agent-os") return "agent-os";
   if (pathname === "/approvals") return "approvals";
+  if (pathname === "/orchestration") return "orchestration";
   if (pathname === "/chat") return "chat";
   if (pathname === "/projects") return "projects";
   if (pathname === "/calendar") return "calendar";
