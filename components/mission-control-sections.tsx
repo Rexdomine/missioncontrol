@@ -9,10 +9,14 @@ import type {
   AlertItem,
   ApprovalItem,
   ChatThread,
+  CommandRunbook,
   ContinuityRecord,
+  DispatchQueueItem,
   FocusItem,
   OperatingTask,
+  PublicationPipelineItem,
   ProjectPulseItem,
+  ReadinessGate,
   SkillRegistryItem,
 } from "./mission-control-data";
 
@@ -430,6 +434,141 @@ export function ContinuitySection({ records }: { records: ContinuityRecord[] }) 
   );
 }
 
+export function ReadinessGatesSection({ gates }: { gates: ReadinessGate[] }) {
+  return (
+    <article className="panel-card control-panel">
+      <SectionHeader
+        detail="Phase 2 turns agent status into preflight gates before work crosses risky boundaries."
+        eyebrow="Safety gates"
+        title="Execution readiness"
+      />
+      <div className="control-grid two-up">
+        {gates.map((gate) => (
+          <div className="control-card" key={gate.id}>
+            <div className="control-card-head">
+              <div>
+                <p className="project-priority">{gate.owner}</p>
+                <h3>{gate.label}</h3>
+              </div>
+              <span className={`status-pill ${readinessTone(gate.status)}`}>
+                {gate.status}
+              </span>
+            </div>
+            <p>{gate.evidence}</p>
+            <div className="control-action">{gate.action}</div>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+export function CommandRunbooksSection({
+  runbooks,
+}: {
+  runbooks: CommandRunbook[];
+}) {
+  return (
+    <article className="panel-card">
+      <SectionHeader
+        detail="Reusable operating paths for common agent moves, with the decision boundary visible up front."
+        eyebrow="Runbooks"
+        title="Command playbooks"
+      />
+      <div className="runbook-list">
+        {runbooks.map((runbook) => (
+          <div className="runbook-card" key={runbook.id}>
+            <div className="control-card-head">
+              <div>
+                <p className="project-priority">{runbook.agent}</p>
+                <h3>{runbook.title}</h3>
+              </div>
+              <span className={`status-pill ${modeTone(runbook.mode)}`}>{runbook.mode}</span>
+            </div>
+            <p className="detail-copy">{runbook.intent}</p>
+            <div className="trigger-line">
+              <span>Trigger</span>
+              <strong>{runbook.trigger}</strong>
+            </div>
+            <ul className="detail-list compact-list">
+              {runbook.checks.map((check) => (
+                <li key={check}>{check}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+export function DispatchQueueSection({
+  items,
+}: {
+  items: DispatchQueueItem[];
+}) {
+  return (
+    <article className="panel-card accent-card">
+      <SectionHeader
+        detail="The dispatch queue separates ready work from blocked lanes so Agent OS does not pretend every task can run now."
+        eyebrow="Dispatch"
+        title="Controlled work queue"
+      />
+      <div className="dispatch-list">
+        {items.map((item) => (
+          <div className="dispatch-card" key={item.id}>
+            <div className="control-card-head">
+              <div>
+                <p className="project-priority">
+                  {item.priority} · {item.agent}
+                </p>
+                <h3>{item.title}</h3>
+              </div>
+              <span className={`status-pill ${dispatchTone(item.readiness)}`}>
+                {item.readiness}
+              </span>
+            </div>
+            <p>{item.scope}</p>
+            <strong>{item.nextStep}</strong>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+export function PublicationPipelineSection({
+  items,
+}: {
+  items: PublicationPipelineItem[];
+}) {
+  return (
+    <article className="panel-card">
+      <SectionHeader
+        detail="A visible publication path keeps reviewable work from stopping in local git state."
+        eyebrow="Publication"
+        title="PR pipeline"
+      />
+      <div className="pipeline-rail">
+        {items.map((item, index) => (
+          <div className="pipeline-step" key={item.id}>
+            <span className="pipeline-index">{index + 1}</span>
+            <div>
+              <div className="pipeline-headline">
+                <h3>{item.label}</h3>
+                <span className={`status-pill ${pipelineTone(item.status)}`}>
+                  {item.status}
+                </span>
+              </div>
+              <p>{item.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 function statusTone(state: AgentStatus["state"], risk: AgentStatus["risk"]) {
   if (state === "Paused" || risk === "High") {
     return "risk";
@@ -458,6 +597,46 @@ function skillStatusTone(status: SkillRegistryItem["status"]) {
     return "waiting";
   }
   return "good";
+}
+
+function readinessTone(status: ReadinessGate["status"]) {
+  if (status === "Blocked") {
+    return "risk";
+  }
+  if (status === "Watch") {
+    return "warning";
+  }
+  return "good";
+}
+
+function modeTone(mode: CommandRunbook["mode"]) {
+  if (mode === "Confirm first") {
+    return "warning";
+  }
+  if (mode === "Manual") {
+    return "waiting";
+  }
+  return "active";
+}
+
+function dispatchTone(readiness: DispatchQueueItem["readiness"]) {
+  if (readiness === "Blocked") {
+    return "risk";
+  }
+  if (readiness === "Needs confirmation") {
+    return "warning";
+  }
+  return "good";
+}
+
+function pipelineTone(status: PublicationPipelineItem["status"]) {
+  if (status === "Done") {
+    return "good";
+  }
+  if (status === "Active") {
+    return "active";
+  }
+  return "waiting";
 }
 
 export function ThreadsSection({ threads }: { threads: ChatThread[] }) {

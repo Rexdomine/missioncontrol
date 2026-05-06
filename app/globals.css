@@ -932,7 +932,12 @@ input {
 .agent-card,
 .ops-task-card,
 .skill-card,
-.continuity-card {
+.continuity-card,
+.control-card,
+.runbook-card,
+.dispatch-card,
+.pipeline-step,
+.agent-os-summary-card {
   border-radius: 18px;
   padding: 16px;
   background: rgba(255, 255, 255, 0.82);
@@ -942,7 +947,9 @@ input {
 .agent-topline,
 .ops-task-topline,
 .skill-topline,
-.continuity-head {
+.continuity-head,
+.control-card-head,
+.pipeline-headline {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -961,6 +968,11 @@ input {
 .ops-task-topline h3,
 .skill-card h3,
 .continuity-card h3,
+.control-card h3,
+.runbook-card h3,
+.dispatch-card h3,
+.pipeline-step h3,
+.agent-os-summary-card h2,
 .os-timeline-item h3 {
   margin: 6px 0 0;
   font-size: 1.05rem;
@@ -970,6 +982,11 @@ input {
 .agent-task,
 .skill-card p,
 .continuity-card p,
+.control-card p,
+.runbook-card p,
+.dispatch-card p,
+.pipeline-step p,
+.agent-os-summary-card p,
 .os-timeline-item p {
   margin: 12px 0 0;
   color: #344256;
@@ -1033,10 +1050,93 @@ input {
 
 .ops-task-list,
 .os-timeline,
-.continuity-list {
+.continuity-list,
+.runbook-list,
+.dispatch-list,
+.pipeline-rail {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.control-panel {
+  background:
+    radial-gradient(circle at bottom left, rgba(201, 127, 36, 0.12), transparent 30%),
+    var(--panel);
+}
+
+.control-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.control-grid.two-up {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.control-action,
+.trigger-line {
+  margin-top: 12px;
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 251, 245, 0.78);
+  border: 1px solid rgba(92, 74, 46, 0.08);
+  color: #223247;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.trigger-line span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.trigger-line strong,
+.dispatch-card strong,
+.agent-os-summary-card strong {
+  display: block;
+  color: #223247;
+  line-height: 1.5;
+}
+
+.dispatch-card strong,
+.agent-os-summary-card strong {
+  margin-top: 12px;
+}
+
+.pipeline-step {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.pipeline-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 900;
+}
+
+.agent-os-summary-card {
+  background:
+    linear-gradient(180deg, rgba(15, 94, 82, 0.08), transparent),
+    rgba(255, 255, 255, 0.86);
+}
+
+.agent-os-summary-card h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.35rem;
 }
 
 .compact-list {
@@ -1133,6 +1233,7 @@ input {
   .detail-metrics,
   .agent-grid,
   .skills-grid,
+  .control-grid.two-up,
   .agent-motion,
   .agent-telemetry,
   .ops-task-detail-grid {
@@ -1149,7 +1250,9 @@ input {
   .agent-topline,
   .ops-task-topline,
   .skill-topline,
-  .continuity-head {
+  .continuity-head,
+  .control-card-head,
+  .pipeline-headline {
     flex-direction: column;
   }
 }
