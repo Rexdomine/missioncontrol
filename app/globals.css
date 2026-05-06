@@ -544,6 +544,10 @@ input {
   align-items: start;
 }
 
+.phase-three-grid {
+  align-items: start;
+}
+
 .board-panel,
 .planner-panel,
 .detail-panel,
@@ -555,6 +559,10 @@ input {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
+}
+
+.phase-three-board {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .board-lane {
@@ -621,6 +629,19 @@ input {
 .project-card.selected,
 .timeline-card.selected,
 .day-chip.selected {
+  border-color: rgba(15, 94, 82, 0.35);
+  background: linear-gradient(180deg, rgba(236, 250, 246, 0.95), rgba(248, 253, 251, 0.96));
+}
+
+.selectable-card {
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.selectable-card.selected {
   border-color: rgba(15, 94, 82, 0.35);
   background: linear-gradient(180deg, rgba(236, 250, 246, 0.95), rgba(248, 253, 251, 0.96));
 }
@@ -736,11 +757,42 @@ input {
 .planner-summary,
 .linked-event-card,
 .waiting-card,
-.queue-card {
+.queue-card,
+.output-card,
+.calendar-output-card {
   border-radius: 18px;
   padding: 16px;
   background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(92, 74, 46, 0.09);
+}
+
+.output-grid,
+.content-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.output-card h3,
+.calendar-output-card h3,
+.phase-three-summary-panel h2 {
+  margin: 6px 0 0;
+  line-height: 1.25;
+}
+
+.output-card p,
+.calendar-output-card p,
+.phase-three-summary-panel p {
+  margin: 12px 0 0;
+  color: #344256;
+  line-height: 1.65;
+}
+
+.phase-three-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
 }
 
 .detail-metric span {
@@ -1236,7 +1288,9 @@ input {
   .control-grid.two-up,
   .agent-motion,
   .agent-telemetry,
-  .ops-task-detail-grid {
+  .ops-task-detail-grid,
+  .output-grid,
+  .content-calendar-grid {
     grid-template-columns: 1fr;
   }
 

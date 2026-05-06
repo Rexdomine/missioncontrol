@@ -208,13 +208,67 @@ export interface PublicationPipelineItem {
   detail: string;
 }
 
+export interface JobRole {
+  id: string;
+  company: string;
+  role: string;
+  fitScore: number;
+  location: string;
+  stage: "Shortlist" | "Tailoring" | "Applied" | "Follow-up";
+  priority: "P1" | "P2" | "P3";
+  deadline: string;
+  whyItFits: string;
+  tailoredAngles: string[];
+  nextAction: string;
+}
+
+export interface ApplicationStage {
+  id: string;
+  title: string;
+  detail: string;
+  roleIds: JobRole["id"][];
+}
+
+export interface JobHuntOutput {
+  id: string;
+  cadence: "Daily" | "Weekly";
+  label: string;
+  state: "Ready" | "Due" | "Watch";
+  detail: string;
+}
+
+export interface ContentIdea {
+  id: string;
+  title: string;
+  pillar: "Prompt to Code" | "Founder Ops" | "AI Native Engineering" | "Personal";
+  stage: "Idea" | "Script" | "Shoot" | "Edit" | "Publish";
+  format: "Short" | "Long-form" | "Carousel";
+  hook: string;
+  nextAction: string;
+}
+
+export interface ContentCalendarItem {
+  id: string;
+  date: string;
+  title: string;
+  channel: string;
+  state: "Planned" | "Shoot ready" | "Editing" | "Scheduled";
+}
+
+export interface ProductionStage {
+  id: string;
+  title: string;
+  detail: string;
+  ideaIds: ContentIdea["id"][];
+}
+
 export const sidebarItems: SidebarItem[] = [
   { key: "today", label: "Today", href: "/", status: "live" },
   { key: "agent-os", label: "Agent OS", href: "/agent-os", status: "live" },
   { key: "projects", label: "Projects", href: "/projects", status: "live" },
   { key: "calendar", label: "Calendar", href: "/calendar", status: "live" },
-  { key: "job-hunt", label: "Job Hunt", href: "/job-hunt", status: "queued" },
-  { key: "content", label: "Content", href: "/content", status: "queued" },
+  { key: "job-hunt", label: "Job Hunt", href: "/job-hunt", status: "live" },
+  { key: "content", label: "Content", href: "/content", status: "live" },
   { key: "approvals", label: "Approvals", href: "/approvals", status: "live" },
   { key: "chat", label: "Chat", href: "/chat", status: "live" },
 ];
@@ -226,13 +280,13 @@ export const agentStatuses: AgentStatus[] = [
     role: "Primary orchestrator",
     state: "Executing",
     project: "Mission Control",
-    currentTask: "Build Agent OS Phase 2 and prepare the first combined PR for Vercel testing.",
-    lastAction: "Confirmed Agent OS Phase 1 is already on `origin/main` through PR #2.",
-    nextAction: "Ship command runbooks, readiness gates, dispatch controls, and the PR pipeline.",
+    currentTask: "Build Agent OS Phase 3 so job hunt and content systems become actionable modules.",
+    lastAction: "Confirmed Phase 2 PR #3 is merged into `main` and started Phase 3 from the fresh baseline.",
+    nextAction: "Verify the new Job Hunt and Content modules, then publish a fresh Phase 3 PR.",
     risk: "Low",
     telemetry: [
       { label: "Mode", value: "Repo execution" },
-      { label: "Surface", value: "Next.js UI" },
+      { label: "Surface", value: "Job Hunt + Content" },
       { label: "PR Gate", value: "Required" },
     ],
   },
@@ -242,12 +296,12 @@ export const agentStatuses: AgentStatus[] = [
     role: "Senior full-stack delivery lane",
     state: "Executing",
     project: "Mission Control",
-    currentTask: "Implement the Phase 2 control layer from clean `origin/main`.",
-    lastAction: "Created `thor/agent-os-phase2` after fetching the merged Agent OS Phase 1 baseline.",
-    nextAction: "Verify locally, run the completion gate, push, and open the Phase 2 PR.",
+    currentTask: "Implement Phase 3 from clean `origin/main` on `thor/agent-os-phase3`.",
+    lastAction: "Created the Phase 3 branch after Phase 2 merged into main.",
+    nextAction: "Run lint, typecheck, build, smoke, push, and open the Phase 3 PR.",
     risk: "Medium",
     telemetry: [
-      { label: "Branch", value: "thor/agent-os-phase2" },
+      { label: "Branch", value: "thor/agent-os-phase3" },
       { label: "Base", value: "origin/main" },
       { label: "Deploy", value: "Vercel preview" },
     ],
@@ -273,17 +327,17 @@ export const agentStatuses: AgentStatus[] = [
 export const operatingTasks: OperatingTask[] = [
   {
     id: "task-mission-control-agent-os",
-    title: "Mission Control Agent OS Phase 2",
+    title: "Mission Control Agent OS Phase 3",
     owner: "Thor",
     lane: "Active",
     project: "Mission Control",
     summary:
-      "Move Agent OS from visibility into controlled execution with runbooks, readiness gates, dispatch state, and publication tracking.",
+      "Turn the recurring job hunt and content workflows into visible, actionable Mission Control pipelines.",
     blocker: "None. Fresh PR required before handoff.",
-    nextAction: "Verify the Phase 2 control layer and publish the first Phase 2 PR.",
+    nextAction: "Verify Phase 3 modules and publish a fresh PR for review.",
     evidence: [
-      "Branch cut from merged `origin/main`",
-      "Frontend-only typed control model",
+      "Branch cut from merged Phase 2 `origin/main`",
+      "Job Hunt and Content routes moved from queued placeholders to live modules",
       "PR gate remains mandatory before handoff",
     ],
   },
@@ -421,8 +475,8 @@ export const continuityRecords: ContinuityRecord[] = [
     id: "continuity-active-lane",
     label: "Active lane",
     source: "Current request",
-    state: "Mission Control Agent OS Phase 2",
-    next: "Turn the Agent OS from visibility into controlled execution.",
+    state: "Mission Control Agent OS Phase 3",
+    next: "Make Job Hunt and Content pipelines live, actionable modules.",
   },
   {
     id: "continuity-nimet",
@@ -527,12 +581,12 @@ export const commandRunbooks: CommandRunbook[] = [
 export const dispatchQueue: DispatchQueueItem[] = [
   {
     id: "dispatch-agent-os-phase2",
-    title: "Mission Control Agent OS Phase 2",
+    title: "Mission Control Agent OS Phase 3",
     agent: "Thor",
     priority: "P1",
     readiness: "Ready",
-    scope: "Frontend Agent OS controls, readiness gates, command runbooks, and publication pipeline.",
-    nextStep: "Verify locally, push a fresh branch, and open the first Phase 2 PR.",
+    scope: "Job Hunt role pipeline plus Content production board and publishing calendar.",
+    nextStep: "Verify locally, push a fresh branch, and open the Phase 3 PR.",
   },
   {
     id: "dispatch-nimet-recovery",
@@ -559,7 +613,7 @@ export const publicationPipeline: PublicationPipelineItem[] = [
     id: "pipeline-scope",
     label: "Scope",
     status: "Done",
-    detail: "Phase 2 is limited to controlled Agent OS execution surfaces with typed seed data.",
+    detail: "Phase 3 is limited to actionable Job Hunt and Content workflow surfaces with typed seed data.",
   },
   {
     id: "pipeline-verify",
@@ -571,7 +625,7 @@ export const publicationPipeline: PublicationPipelineItem[] = [
     id: "pipeline-pr",
     label: "Publish",
     status: "Next",
-    detail: "Push `thor/agent-os-phase2` and open a PR against `main` for Vercel preview testing.",
+    detail: "Push `thor/agent-os-phase3` and open a PR against `main` for Vercel preview testing.",
   },
 ];
 
@@ -1008,6 +1062,231 @@ export const projectPulse: ProjectPulseItem[] = projectPortfolio.slice(0, 3).map
     href: `/projects?project=${project.id}`,
   }),
 );
+
+export const jobRoles: JobRole[] = [
+  {
+    id: "role-ai-fullstack-platform",
+    company: "Northstar AI Labs",
+    role: "AI Native Fullstack Engineer",
+    fitScore: 94,
+    location: "Remote · EU/Africa overlap",
+    stage: "Tailoring",
+    priority: "P1",
+    deadline: "Apply today",
+    whyItFits:
+      "Strong match for product engineering, agent workflows, Next.js, and AI-native delivery ownership.",
+    tailoredAngles: [
+      "Lead with Mission Control as proof of agentic product thinking.",
+      "Position Thor/StarLord workflow as practical full-stack automation experience.",
+      "Mention CounterFix founder context for product judgment and execution speed.",
+    ],
+    nextAction: "Tailor the opening paragraph and ship the application before close of day.",
+  },
+  {
+    id: "role-product-engineer-ai",
+    company: "ForgeWorks",
+    role: "Senior Product Engineer, AI Tools",
+    fitScore: 88,
+    location: "Remote · Global",
+    stage: "Shortlist",
+    priority: "P1",
+    deadline: "Review by Friday",
+    whyItFits:
+      "Requires rapid UI delivery, workflow design, and judgment around human-in-the-loop automation.",
+    tailoredAngles: [
+      "Showcase dashboard and operator-console work across Mission Control and NiMet.",
+      "Emphasize verified PR workflow and strong product taste.",
+      "Frame founder experience as bias for useful, shippable tools.",
+    ],
+    nextAction: "Confirm compensation/location fit, then move to tailoring if the signal stays strong.",
+  },
+  {
+    id: "role-agent-platform",
+    company: "RelayOps",
+    role: "Agent Platform Engineer",
+    fitScore: 82,
+    location: "Remote · US overlap preferred",
+    stage: "Applied",
+    priority: "P2",
+    deadline: "Follow up in 3 days",
+    whyItFits:
+      "Agent orchestration and operational tooling are aligned, but timezone expectations need watching.",
+    tailoredAngles: [
+      "Anchor on safe autonomy, approval boundaries, and durable memory design.",
+      "Use Mission Control Agent OS as the practical artifact.",
+      "Keep timezone coverage honest instead of overpromising availability.",
+    ],
+    nextAction: "Prepare a concise follow-up note with one artifact link and a clear value proposition.",
+  },
+  {
+    id: "role-ai-frontend-systems",
+    company: "StudioStack",
+    role: "Frontend Systems Engineer, AI Products",
+    fitScore: 77,
+    location: "Remote · Contract-to-hire",
+    stage: "Follow-up",
+    priority: "P3",
+    deadline: "Check next week",
+    whyItFits:
+      "Frontend systems match is solid, but the contract-to-hire path is lower priority than full-time remote roles.",
+    tailoredAngles: [
+      "Feature fast design-to-product integration work.",
+      "Show typed UI state and verification discipline.",
+      "Ask early about conversion timeline and expected weekly overlap.",
+    ],
+    nextAction: "Keep warm, but do not let it displace stronger P1 applications.",
+  },
+];
+
+export const applicationStages: ApplicationStage[] = [
+  {
+    id: "stage-shortlist",
+    title: "Shortlist",
+    detail: "Roles worth scoring before Rex spends tailoring energy.",
+    roleIds: ["role-product-engineer-ai"],
+  },
+  {
+    id: "stage-tailoring",
+    title: "Tailoring",
+    detail: "High-fit roles that need a specific angle and proof point before sending.",
+    roleIds: ["role-ai-fullstack-platform"],
+  },
+  {
+    id: "stage-applied",
+    title: "Applied",
+    detail: "Sent applications waiting for response or scheduled follow-up.",
+    roleIds: ["role-agent-platform"],
+  },
+  {
+    id: "stage-follow-up",
+    title: "Follow-up",
+    detail: "Warm leads where a short, useful nudge is the next move.",
+    roleIds: ["role-ai-frontend-systems"],
+  },
+];
+
+export const jobHuntOutputs: JobHuntOutput[] = [
+  {
+    id: "job-output-daily",
+    cadence: "Daily",
+    label: "Daily shortlist sweep",
+    state: "Ready",
+    detail: "Convert new remote AI/full-stack leads into a scored shortlist with skip reasons.",
+  },
+  {
+    id: "job-output-weekly",
+    cadence: "Weekly",
+    label: "Monday application review",
+    state: "Due",
+    detail: "Pick the best two roles, tailor the angle, and send before the day fragments.",
+  },
+  {
+    id: "job-output-quality",
+    cadence: "Daily",
+    label: "Quality guardrail",
+    state: "Watch",
+    detail: "Flag weak matches early so the pipeline stays focused on high-signal roles.",
+  },
+];
+
+export const contentIdeas: ContentIdea[] = [
+  {
+    id: "idea-agent-os-walkthrough",
+    title: "Building my personal Agent OS",
+    pillar: "Prompt to Code",
+    stage: "Script",
+    format: "Long-form",
+    hook: "I stopped treating AI agents like chatbots and started building them an operating system.",
+    nextAction: "Turn the Mission Control Phase 3 PR into a 7-minute walkthrough outline.",
+  },
+  {
+    id: "idea-codex-thor-debug",
+    title: "What broke when my coding agent lost the task",
+    pillar: "AI Native Engineering",
+    stage: "Idea",
+    format: "Short",
+    hook: "The model was fine. The task delivery layer was the bug.",
+    nextAction: "Capture the lesson as a 45-second engineering story without exposing private config.",
+  },
+  {
+    id: "idea-founder-weekly-reset",
+    title: "Founder weekly reset with AI operators",
+    pillar: "Founder Ops",
+    stage: "Shoot",
+    format: "Short",
+    hook: "A weekly reset is easier when your dashboard already knows what is blocked.",
+    nextAction: "Shoot the opening and one screen-recording segment after the Job Hunt module lands.",
+  },
+  {
+    id: "idea-birthday-creative-bts",
+    title: "Birthday shoot planning behind the scenes",
+    pillar: "Personal",
+    stage: "Edit",
+    format: "Carousel",
+    hook: "Turning a birthday idea into an actual production plan takes less chaos than you think.",
+    nextAction: "Pair the gallery decision with a simple shot-list carousel draft.",
+  },
+  {
+    id: "idea-remote-role-positioning",
+    title: "How I position as an AI Native Fullstack Engineer",
+    pillar: "AI Native Engineering",
+    stage: "Publish",
+    format: "Short",
+    hook: "Your portfolio should show how you work, not just what stack you know.",
+    nextAction: "Schedule after the next two applications are sent.",
+  },
+];
+
+export const contentCalendar: ContentCalendarItem[] = [
+  {
+    id: "content-calendar-agent-os",
+    date: "Mon",
+    title: "Agent OS walkthrough outline",
+    channel: "YouTube + LinkedIn",
+    state: "Planned",
+  },
+  {
+    id: "content-calendar-founder-reset",
+    date: "Wed",
+    title: "Founder weekly reset short",
+    channel: "Shorts + TikTok",
+    state: "Shoot ready",
+  },
+  {
+    id: "content-calendar-positioning",
+    date: "Fri",
+    title: "AI Native Fullstack positioning clip",
+    channel: "LinkedIn",
+    state: "Scheduled",
+  },
+];
+
+export const productionStages: ProductionStage[] = [
+  {
+    id: "content-stage-idea",
+    title: "Idea backlog",
+    detail: "Promising hooks that still need a point of view.",
+    ideaIds: ["idea-codex-thor-debug"],
+  },
+  {
+    id: "content-stage-script",
+    title: "Script",
+    detail: "Ideas with a clear argument that need structure before recording.",
+    ideaIds: ["idea-agent-os-walkthrough"],
+  },
+  {
+    id: "content-stage-shoot",
+    title: "Shoot",
+    detail: "Ready to capture once time, shot list, and setup are locked.",
+    ideaIds: ["idea-founder-weekly-reset"],
+  },
+  {
+    id: "content-stage-publish",
+    title: "Edit / Publish",
+    detail: "Assets moving through the final production and release queue.",
+    ideaIds: ["idea-birthday-creative-bts", "idea-remote-role-positioning"],
+  },
+];
 
 export const approvalItems: ApprovalItem[] = [
   {

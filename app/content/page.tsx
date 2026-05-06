@@ -1,26 +1,27 @@
-import { EmptyModuleState, MissionControlLayout, PageHero } from "@/components/mission-control-layout";
+import { contentCalendar, contentIdeas, productionStages } from "@/components/mission-control-data";
+import { MissionControlLayout, PageHero } from "@/components/mission-control-layout";
+import { ContentPipelineModule } from "@/components/mission-control-phase-three";
 
 export default function ContentPage() {
+  const activeAssets = contentIdeas.filter((idea) => idea.stage !== "Publish").length;
+  const scheduledItems = contentCalendar.filter((item) => item.state === "Scheduled").length;
+
   return (
     <MissionControlLayout
       hero={
         <PageHero
-          copy="The content route is part of Phase 1 routing completeness, while the real backlog and production board are part of Phase 3."
+          copy="Phase 3 gives Prompt to Code, founder ops, AI-native engineering, and personal creative work a real production board with hooks, shoot states, and a publishing calendar."
           eyebrow="Content"
           metrics={[
-            { label: "Module state", value: "Queued" },
-            { label: "Next phase", value: "Phase 3" },
-            { label: "Planned view", value: "Backlog + Calendar" },
+            { label: "Ideas tracked", value: String(contentIdeas.length) },
+            { label: "Production stages", value: String(productionStages.length) },
+            { label: "Scheduled", value: `${scheduledItems}/${contentCalendar.length}` },
           ]}
-          title="Content ops come after the operating core."
+          title={`${activeAssets} content assets are moving through production.`}
         />
       }
     >
-      <EmptyModuleState
-        action="Next: content backlog, production statuses, and publishing calendar."
-        body="This module will manage shoot planning, ideas, drafts, and publishing once the core dashboard is runtime-verified."
-        title="Content workflow is staged with a stable route."
-      />
+      <ContentPipelineModule />
     </MissionControlLayout>
   );
 }
