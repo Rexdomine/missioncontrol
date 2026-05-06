@@ -2,9 +2,14 @@ export default function Loading() {
   return (
     <main className="loading-shell" aria-busy="true" aria-live="polite">
       <div className="loading-card">
-        <p className="eyebrow">Mission Control</p>
-        <h1>Loading workspace</h1>
-        <p>Preparing the active workspace, connected modules, and route state.</p>
+        <p className="eyebrow">Mission Control · Loading state</p>
+        <h1>Preparing workspace context</h1>
+        <p>Loading connected modules, trust indicators, and route state without losing the operating context.</p>
+        <div className="loading-state-rail" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
       </div>
     </main>
   );
