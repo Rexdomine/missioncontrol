@@ -1,16 +1,16 @@
 import {
   activityTimeline,
   agentStatuses,
-  approvalAnomalyFeed,
-  automationRunHistory,
   commandRunbooks,
   connectorHealthSummaries,
   continuityRecords,
   dispatchQueue,
+  multiStepWorkflows,
   operatingTasks,
+  orchestrationTimeline,
   publicationPipeline,
   readinessGates,
-  severityAlerts,
+  recommendationItems,
   skillRegistry,
 } from "@/components/mission-control-data";
 import Link from "next/link";
@@ -37,14 +37,14 @@ export default function AgentOSPage() {
     <MissionControlLayout
       hero={
         <PageHero
-          copy="Agent OS Phase 4 keeps execution controls and personal-growth pipelines visible while adding approvals, alerts, automation history, and workflow-health diagnostics."
+          copy="Agent OS Phase 5 connects execution controls, workflow health, memory, recommendations, and guided workflows into one orchestration layer."
           eyebrow="Agent OS"
           metrics={[
             { label: "Active agents", value: String(activeAgents) },
-            { label: "Workflow watches", value: String(unhealthyWorkflows) },
-            { label: "Alert signals", value: String(severityAlerts.length) },
+            { label: "Timeline signals", value: String(orchestrationTimeline.length) },
+            { label: "Recommendations", value: String(recommendationItems.length) },
           ]}
-          title="Agent OS now exposes workflow health before failures become friction."
+          title="Agent OS now guides action across every Mission Control module."
         />
       }
     >
@@ -54,36 +54,36 @@ export default function AgentOSPage() {
           <ReadinessGatesSection gates={readinessGates} />
           <CommandRunbooksSection runbooks={commandRunbooks} />
           <article className="panel-card phase-three-summary-panel">
-            <p className="eyebrow">Phase 4 workflow health</p>
-            <h2>Approvals, alerts, and automation failures now have one diagnostic surface.</h2>
+            <p className="eyebrow">Phase 5 orchestration</p>
+            <h2>Mission Control now has a cross-module command layer.</h2>
             <p>
-              The approvals module now includes alert severity, automation run history,
-              approval anomaly cards, and cron/connector health so stale noise and connector
-              failures are visible before they block Rex.
+              The orchestration layer adds a central timeline, recommendation tray,
+              unified command/search, memory-aware summaries, assistant guidance, and
+              staged multi-step workflows that can start from chat or cards.
             </p>
             <div className="health-snapshot-grid">
               <div>
-                <span>Runs tracked</span>
-                <strong>{automationRunHistory.length}</strong>
+                <span>Signals</span>
+                <strong>{orchestrationTimeline.length}</strong>
               </div>
               <div>
-                <span>Anomalies</span>
-                <strong>{approvalAnomalyFeed.length}</strong>
+                <span>Workflows</span>
+                <strong>{multiStepWorkflows.length}</strong>
               </div>
               <div>
-                <span>Health checks</span>
-                <strong>{connectorHealthSummaries.length}</strong>
+                <span>Health watches</span>
+                <strong>{unhealthyWorkflows}</strong>
               </div>
             </div>
             <div className="phase-three-link-row">
+              <Link className="detail-link" href="/orchestration">
+                Open Orchestration Layer
+              </Link>
               <Link className="detail-link" href="/approvals">
                 Open Workflow Health
               </Link>
               <Link className="detail-link" href="/job-hunt">
                 Open Job Hunt
-              </Link>
-              <Link className="detail-link" href="/content">
-                Open Content
               </Link>
             </div>
           </article>
