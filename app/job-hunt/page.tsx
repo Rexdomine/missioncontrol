@@ -1,26 +1,27 @@
-import { EmptyModuleState, MissionControlLayout, PageHero } from "@/components/mission-control-layout";
+import { applicationStages, jobHuntOutputs, jobRoles } from "@/components/mission-control-data";
+import { MissionControlLayout, PageHero } from "@/components/mission-control-layout";
+import { JobHuntPipelineModule } from "@/components/mission-control-phase-three";
 
 export default function JobHuntPage() {
+  const tailoringCount = jobRoles.filter((role) => role.stage === "Tailoring").length;
+  const readyOutputs = jobHuntOutputs.filter((output) => output.state === "Ready").length;
+
   return (
     <MissionControlLayout
       hero={
         <PageHero
-          copy="The route exists now so the information architecture is stable. The real pipeline UI lands after the operational core is verified."
+          copy="Phase 3 turns the remote-role hunt from recurring intent into an actionable pipeline: scored roles, application stages, tailored angles, and daily/weekly outputs now live in one module."
           eyebrow="Job Hunt"
           metrics={[
-            { label: "Module state", value: "Queued" },
-            { label: "Next phase", value: "Phase 3" },
-            { label: "Source", value: "Automation ready" },
+            { label: "Tracked roles", value: String(jobRoles.length) },
+            { label: "Pipeline stages", value: String(applicationStages.length) },
+            { label: "Ready outputs", value: `${readyOutputs}/${jobHuntOutputs.length}` },
           ]}
-          title="Job Hunt becomes a first-class workflow in Phase 3."
+          title={`${tailoringCount} high-fit role needs tailoring now.`}
         />
       }
     >
-      <EmptyModuleState
-        action="Next: shortlist table, application stages, and role detail panels."
-        body="The automated job hunt already exists in the workspace. This module will become the visual command layer on top of that system."
-        title="Job Hunt UI is planned and routed."
-      />
+      <JobHuntPipelineModule />
     </MissionControlLayout>
   );
 }
