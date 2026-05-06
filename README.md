@@ -1,10 +1,11 @@
 # Mission Control
 
-Mission Control is the visual dashboard for working with StarLord.
+Mission Control is the visual dashboard and Agent OS console for working with StarLord, Thor, background automations, project memory, and execution workflows.
 
 ## Initial Scope
 
 - Today
+- Agent OS
 - Projects
 - Calendar
 - Job Hunt
@@ -84,4 +85,4 @@ Security notes:
 
 ## Notes
 
-This scaffold is intentionally lightweight. It establishes the product shell and architecture before integrating real connectors and workflow state.
+Phase 1 of the Agent OS is intentionally frontend-first. It establishes the operating model, typed seed data, and reviewable UI surfaces before replacing the static data with real telemetry from sessions, commands, memory, tools, GitHub, and scheduler state.

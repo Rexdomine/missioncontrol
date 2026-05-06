@@ -1,5 +1,6 @@
 export type ModuleKey =
   | "today"
+  | "agent-os"
   | "projects"
   | "calendar"
   | "job-hunt"
@@ -119,14 +120,295 @@ export interface CalendarEvent {
   executionContext: string[];
 }
 
+export interface AgentStatus {
+  id: string;
+  name: string;
+  role: string;
+  state: "Executing" | "Paused" | "Monitoring" | "Idle";
+  project: string;
+  currentTask: string;
+  lastAction: string;
+  nextAction: string;
+  risk: "Low" | "Medium" | "High";
+  telemetry: Array<{ label: string; value: string }>;
+}
+
+export interface OperatingTask {
+  id: string;
+  title: string;
+  owner: string;
+  lane: "Active" | "Paused" | "Monitoring" | "Ready";
+  project: string;
+  summary: string;
+  blocker: string;
+  nextAction: string;
+  evidence: string[];
+}
+
+export interface ActivityEvent {
+  id: string;
+  time: string;
+  actor: string;
+  type: "Repo" | "Deploy" | "Memory" | "Automation" | "Planning";
+  title: string;
+  detail: string;
+  artifact: string;
+}
+
+export interface SkillRegistryItem {
+  id: string;
+  name: string;
+  category: "Repo" | "Memory" | "Ops" | "Browser" | "GitHub" | "Workflow";
+  status: "Ready" | "Needs attention" | "Queued";
+  lastUsed: string;
+  purpose: string;
+}
+
+export interface ContinuityRecord {
+  id: string;
+  label: string;
+  source: string;
+  state: string;
+  next: string;
+}
+
 export const sidebarItems: SidebarItem[] = [
   { key: "today", label: "Today", href: "/", status: "live" },
+  { key: "agent-os", label: "Agent OS", href: "/agent-os", status: "live" },
   { key: "projects", label: "Projects", href: "/projects", status: "live" },
   { key: "calendar", label: "Calendar", href: "/calendar", status: "live" },
   { key: "job-hunt", label: "Job Hunt", href: "/job-hunt", status: "queued" },
   { key: "content", label: "Content", href: "/content", status: "queued" },
   { key: "approvals", label: "Approvals", href: "/approvals", status: "live" },
   { key: "chat", label: "Chat", href: "/chat", status: "live" },
+];
+
+export const agentStatuses: AgentStatus[] = [
+  {
+    id: "agent-starlord",
+    name: "StarLord",
+    role: "Primary orchestrator",
+    state: "Executing",
+    project: "Mission Control",
+    currentTask: "Build Agent OS Phase 1 and prepare a fresh PR for Vercel testing.",
+    lastAction: "Paused NiMet OnePortal with a durable deploy blocker pointer.",
+    nextAction: "Ship the Agent OS overview, timeline, lanes, skills registry, and continuity viewer.",
+    risk: "Low",
+    telemetry: [
+      { label: "Mode", value: "Repo execution" },
+      { label: "Surface", value: "Next.js UI" },
+      { label: "PR Gate", value: "Required" },
+    ],
+  },
+  {
+    id: "agent-thor",
+    name: "Thor",
+    role: "Senior full-stack delivery lane",
+    state: "Executing",
+    project: "Mission Control",
+    currentTask: "Implement reviewable frontend slice from clean `origin/main` worktree.",
+    lastAction: "Resolved repo state and isolated dirty legacy worktree from this branch.",
+    nextAction: "Run lint, typecheck, build, commit, push, and open a PR.",
+    risk: "Medium",
+    telemetry: [
+      { label: "Branch", value: "thor/agent-os-phase1" },
+      { label: "Base", value: "origin/main" },
+      { label: "Deploy", value: "Vercel preview" },
+    ],
+  },
+  {
+    id: "agent-automation",
+    name: "Automation",
+    role: "Recurring background operations",
+    state: "Monitoring",
+    project: "Remote role hunt",
+    currentTask: "Weekday search and email workflow remains the standing recurring lane.",
+    lastAction: "Latest run fell back to manual web scan because Tavily runtime auth was pending.",
+    nextAction: "Keep automation visible and flag connection drift before the next weekday run.",
+    risk: "Medium",
+    telemetry: [
+      { label: "Cadence", value: "Weekdays" },
+      { label: "Delivery", value: "Email" },
+      { label: "Runtime", value: "Watch auth" },
+    ],
+  },
+];
+
+export const operatingTasks: OperatingTask[] = [
+  {
+    id: "task-mission-control-agent-os",
+    title: "Mission Control Agent OS Phase 1",
+    owner: "Thor",
+    lane: "Active",
+    project: "Mission Control",
+    summary:
+      "Turn Mission Control into the operating console for agents, tasks, project state, skills, and continuity.",
+    blocker: "None. Fresh PR required before handoff.",
+    nextAction: "Publish the Phase 1 Agent OS branch for Vercel preview testing.",
+    evidence: [
+      "Clean worktree from `origin/main`",
+      "Frontend-only typed seed data",
+      "Verification gate planned before PR",
+    ],
+  },
+  {
+    id: "task-nimet-lexical-deploy",
+    title: "NiMet Lexical editor deployment",
+    owner: "Thor",
+    lane: "Paused",
+    project: "NiMet OnePortal",
+    summary:
+      "PR #45 is merged, but the live containers are stale because the VPS deploy failed before rollout.",
+    blocker: "VPS root disk is full: 15G total, 15G used, 0 available.",
+    nextAction:
+      "When NiMet resumes, free safe disk space, rerun deploy to `858bbb3`, then verify `/apps/documents/new`.",
+    evidence: [
+      "`last_deployed_sha` still at PR #44 `b99cc56`",
+      "`nimet-oneportal-deploy.service` failed with out-of-diskspace",
+      "Lexical files are present in VPS checkout but not confirmed live",
+    ],
+  },
+  {
+    id: "task-role-hunt",
+    title: "Weekday remote role hunt",
+    owner: "StarLord",
+    lane: "Monitoring",
+    project: "Career and Work",
+    summary:
+      "Recurring job-search automation remains useful, but connector state should be visible when runtime auth drifts.",
+    blocker: "Tavily connection was pending during the latest run.",
+    nextAction: "Surface next-run readiness and output quality from Mission Control.",
+    evidence: [
+      "Cron schedule recorded in memory",
+      "Email delivery path exists",
+      "Runtime search connector needs visibility",
+    ],
+  },
+];
+
+export const activityTimeline: ActivityEvent[] = [
+  {
+    id: "activity-agent-os-start",
+    time: "12:52",
+    actor: "Thor",
+    type: "Planning",
+    title: "Agent OS Phase 1 started",
+    detail:
+      "Mission Control lane selected and implementation scoped to visibility, continuity, and reviewable frontend surfaces.",
+    artifact: "Branch `thor/agent-os-phase1`",
+  },
+  {
+    id: "activity-nimet-pause",
+    time: "12:36",
+    actor: "StarLord",
+    type: "Memory",
+    title: "NiMet pause marker saved",
+    detail:
+      "Saved the exact PR #45 deploy blocker so the project can resume from disk cleanup and redeploy.",
+    artifact: "memory/tasks.md",
+  },
+  {
+    id: "activity-nimet-deploy",
+    time: "11:18",
+    actor: "Thor",
+    type: "Deploy",
+    title: "NiMet VPS disk full",
+    detail:
+      "Confirmed root filesystem at 100% and deploy marker still behind the Lexical editor merge.",
+    artifact: "VPS `df -h` + deploy service status",
+  },
+  {
+    id: "activity-role-hunt",
+    time: "08:00",
+    actor: "Automation",
+    type: "Automation",
+    title: "Remote role hunt checked",
+    detail:
+      "Daily workflow ran with connector caveat recorded for future reliability tracking.",
+    artifact: "memory/tools.md",
+  },
+];
+
+export const skillRegistry: SkillRegistryItem[] = [
+  {
+    id: "skill-thor-repo",
+    name: "Thor repo workflow",
+    category: "Repo",
+    status: "Ready",
+    lastUsed: "Now",
+    purpose: "Inspect, implement, verify, commit, push, and publish repo work through a fresh PR.",
+  },
+  {
+    id: "skill-pr-gate",
+    name: "PR publication gate",
+    category: "GitHub",
+    status: "Ready",
+    lastUsed: "Now",
+    purpose: "Prevents local-only completion for reviewable work by requiring a fresh PR.",
+  },
+  {
+    id: "skill-memory",
+    name: "StarLord memory",
+    category: "Memory",
+    status: "Ready",
+    lastUsed: "Today",
+    purpose: "Keeps durable project, task, tool, and preference context across sessions.",
+  },
+  {
+    id: "skill-proactive",
+    name: "Proactive ops",
+    category: "Ops",
+    status: "Ready",
+    lastUsed: "Today",
+    purpose: "Runs low-risk checks, verifies state directly, and stays quiet unless there is useful signal.",
+  },
+  {
+    id: "skill-browser",
+    name: "Browser automation",
+    category: "Browser",
+    status: "Needs attention",
+    lastUsed: "May 5",
+    purpose: "Visual verification and website interaction; local Chromium libraries need repair for screenshots.",
+  },
+  {
+    id: "skill-taskflow",
+    name: "TaskFlow",
+    category: "Workflow",
+    status: "Queued",
+    lastUsed: "Not active",
+    purpose: "Durable detached workflows for multi-step background jobs once Mission Control exposes controls.",
+  },
+];
+
+export const continuityRecords: ContinuityRecord[] = [
+  {
+    id: "continuity-active-lane",
+    label: "Active lane",
+    source: "Current request",
+    state: "Mission Control Agent OS Phase 1",
+    next: "Implement and publish the Vercel-testable PR.",
+  },
+  {
+    id: "continuity-nimet",
+    label: "Paused lane",
+    source: "memory/tasks.md",
+    state: "NiMet OnePortal paused at deploy blocker.",
+    next: "Free VPS disk, redeploy PR #45, verify Lexical editor.",
+  },
+  {
+    id: "continuity-tools",
+    label: "Tool readiness",
+    source: "TOOLS.md + memory/tools.md",
+    state: "GitHub CLI is ready; NiMet SSH helper needs PATH-wrapped sshpass/ssh in this runtime.",
+    next: "Expose tool readiness in the Agent OS registry before deeper controls.",
+  },
+  {
+    id: "continuity-pr-rule",
+    label: "Publication rule",
+    source: "Thor PR gate",
+    state: "Every reviewable repo update ends in a fresh PR unless explicitly paused.",
+    next: "Run verification and completion gate before handoff.",
+  },
 ];
 
 export const focusItems: FocusItem[] = [
@@ -139,12 +421,12 @@ export const focusItems: FocusItem[] = [
     href: "/projects?project=birthday-content",
   },
   {
-    id: "focus-phase-one",
-    title: "Mission Control Phase 2",
+    id: "focus-agent-os",
+    title: "Mission Control Agent OS",
     detail:
-      "Turn Projects and Calendar into execution surfaces with connected context and clear next actions.",
+      "Ship the first operating-system layer for agents, task state, skills, activity, and continuity.",
     tag: "In Build",
-    href: "/projects?project=missioncontrol-phase-two",
+    href: "/agent-os",
   },
   {
     id: "focus-role-hunt",
@@ -618,6 +900,7 @@ export const chatThreads: ChatThread[] = [
 
 export const quickActions = [
   "Summarize what matters today",
+  "Open the Agent OS operations view",
   "Show me blockers across active work",
   "Show this week's prep-needed meetings",
   "Draft a booking message for the gallery",
@@ -625,6 +908,7 @@ export const quickActions = [
 ];
 
 export function getActiveModule(pathname: string): ModuleKey {
+  if (pathname === "/agent-os") return "agent-os";
   if (pathname === "/approvals") return "approvals";
   if (pathname === "/chat") return "chat";
   if (pathname === "/projects") return "projects";

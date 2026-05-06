@@ -912,6 +912,159 @@ input {
   letter-spacing: 0.08em;
 }
 
+.agent-os-grid {
+  align-items: start;
+}
+
+.agent-ops-panel {
+  background:
+    radial-gradient(circle at top right, rgba(15, 94, 82, 0.1), transparent 28%),
+    var(--panel);
+}
+
+.agent-grid,
+.skills-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.agent-card,
+.ops-task-card,
+.skill-card,
+.continuity-card {
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(92, 74, 46, 0.09);
+}
+
+.agent-topline,
+.ops-task-topline,
+.skill-topline,
+.continuity-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.agent-role,
+.agent-project {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.agent-topline h3,
+.ops-task-topline h3,
+.skill-card h3,
+.continuity-card h3,
+.os-timeline-item h3 {
+  margin: 6px 0 0;
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.agent-task,
+.skill-card p,
+.continuity-card p,
+.os-timeline-item p {
+  margin: 12px 0 0;
+  color: #344256;
+  line-height: 1.6;
+}
+
+.agent-motion {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.agent-motion div,
+.mini-metric,
+.ops-task-detail-grid div {
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 251, 245, 0.78);
+  border: 1px solid rgba(92, 74, 46, 0.08);
+}
+
+.agent-motion span,
+.mini-metric span,
+.ops-task-detail-grid span,
+.continuity-head span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.45;
+  text-transform: uppercase;
+}
+
+.agent-motion p,
+.ops-task-detail-grid strong,
+.continuity-card strong {
+  display: block;
+  margin: 7px 0 0;
+  color: #223247;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.agent-telemetry,
+.ops-task-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mini-metric strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--accent-deep);
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.ops-task-list,
+.os-timeline,
+.continuity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.compact-list {
+  margin-top: 12px;
+}
+
+.os-timeline-item {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 14px;
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(92, 74, 46, 0.09);
+}
+
+.os-timeline-item time {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: start;
+  min-height: 46px;
+  border-radius: 14px;
+  background: var(--gold-soft);
+  color: #6a4309;
+  font-weight: 800;
+}
+
 .loading-shell {
   min-height: 100vh;
   display: grid;
@@ -977,7 +1130,12 @@ input {
   .project-board,
   .week-strip,
   .detail-card.split,
-  .detail-metrics {
+  .detail-metrics,
+  .agent-grid,
+  .skills-grid,
+  .agent-motion,
+  .agent-telemetry,
+  .ops-task-detail-grid {
     grid-template-columns: 1fr;
   }
 
@@ -987,7 +1145,11 @@ input {
   .event-headline,
   .project-connection-topline,
   .waiting-card-topline,
-  .queue-topline {
+  .queue-topline,
+  .agent-topline,
+  .ops-task-topline,
+  .skill-topline,
+  .continuity-head {
     flex-direction: column;
   }
 }
@@ -1021,7 +1183,8 @@ input {
     max-width: none;
   }
 
-  .timeline-card {
+  .timeline-card,
+  .os-timeline-item {
     grid-template-columns: 1fr;
   }
 
