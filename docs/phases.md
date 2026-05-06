@@ -186,3 +186,30 @@ Make the product feel stable, high-signal, and reliable enough for daily use.
 
 - Rex can use the app daily from desktop and mobile
 - the app feels intentional and dependable
+
+## Phase 7: Handoff, Pause/Resume, and Operating Cadence Layer
+
+### Goal
+
+Make Mission Control safe to use across project switches by preserving review packets, pause markers, resume instructions, and recurring operating outputs.
+
+### Features
+
+- handoff route
+- review-ready work packets
+- pause/resume lane markers
+- operating cadence definitions
+- Agent OS cockpit links into the handoff layer
+
+### UI
+
+- handoff scorecards for ready packets, paused lanes, and cadence coverage
+- review packet cards with owner, state, included evidence, and next action
+- pause/resume cards with preserved context and explicit resume triggers
+- cadence cards for daily command briefs, PR handoffs, lane resumes, and weekly operating reviews
+
+### Success Criteria
+
+- Rex can switch from NiMet to Mission Control without losing where NiMet resumes
+- reviewable work carries enough evidence to inspect or merge without replaying chat history
+- Agent OS separates active, paused, watch, and review states clearly

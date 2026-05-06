@@ -2030,3 +2030,87 @@ input:focus-visible {
     font-size: 1.45rem;
   }
 }
+
+/* Phase 7 handoff, pause/resume, and operating cadence layer */
+.handoff-grid {
+  align-items: start;
+}
+
+.handoff-hero-panel {
+  background:
+    radial-gradient(circle at top right, rgba(178, 122, 31, 0.16), transparent 30%),
+    linear-gradient(180deg, rgba(255, 251, 245, 0.98), rgba(250, 244, 232, 0.95));
+}
+
+.handoff-score-grid,
+.handoff-packet-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.handoff-packet-card,
+.pause-marker-card,
+.cadence-card {
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(92, 74, 46, 0.09);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.handoff-packet-card p,
+.pause-marker-card p,
+.cadence-card p {
+  margin: 10px 0 0;
+  color: #344256;
+  line-height: 1.6;
+}
+
+.handoff-packet-card strong,
+.cadence-card strong {
+  display: block;
+  margin-top: 12px;
+  color: #223247;
+  line-height: 1.5;
+}
+
+.pause-marker-list,
+.cadence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.provenance-strip.wrap {
+  grid-template-columns: 1fr;
+}
+
+.cadence-card span {
+  color: var(--gold);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cadence-card h3 {
+  margin: 6px 0 0;
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 1120px) {
+  .handoff-score-grid,
+  .handoff-packet-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .handoff-packet-card,
+  .pause-marker-card,
+  .cadence-card {
+    padding: 14px;
+  }
+}

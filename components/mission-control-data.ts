@@ -8,6 +8,7 @@ export type ModuleKey =
   | "approvals"
   | "orchestration"
   | "trust"
+  | "handoff"
   | "chat";
 
 export interface SidebarItem {
@@ -406,6 +407,33 @@ export interface DesignSystemToken {
   purpose: string;
 }
 
+export interface HandoffPacket {
+  id: string;
+  title: string;
+  owner: "StarLord" | "Thor" | "Rex";
+  state: "Ready" | "In review" | "Paused";
+  summary: string;
+  includes: string[];
+  nextAction: string;
+}
+
+export interface PauseResumeMarker {
+  id: string;
+  project: string;
+  status: "Paused" | "Active" | "Watch";
+  reason: string;
+  resumeWhen: string;
+  preservedContext: string[];
+}
+
+export interface OperatingCadenceItem {
+  id: string;
+  cadence: "Daily" | "Weekly" | "Per PR" | "On resume";
+  title: string;
+  signal: string;
+  output: string;
+}
+
 export const sidebarItems: SidebarItem[] = [
   { key: "today", label: "Today", href: "/", status: "live" },
   { key: "agent-os", label: "Agent OS", href: "/agent-os", status: "live" },
@@ -416,6 +444,7 @@ export const sidebarItems: SidebarItem[] = [
   { key: "approvals", label: "Approvals", href: "/approvals", status: "live" },
   { key: "orchestration", label: "Orchestration", href: "/orchestration", status: "live" },
   { key: "trust", label: "Trust", href: "/trust", status: "live" },
+  { key: "handoff", label: "Handoff", href: "/handoff", status: "live" },
   { key: "chat", label: "Chat", href: "/chat", status: "live" },
 ];
 
@@ -426,9 +455,9 @@ export const agentStatuses: AgentStatus[] = [
     role: "Primary orchestrator",
     state: "Executing",
     project: "Mission Control",
-    currentTask: "Build Agent OS Phase 6 so Mission Control feels polished, mobile-ready, and trustworthy for daily use.",
-    lastAction: "Confirmed Phase 5 PR #7 is merged into `main` and started Phase 6 from fresh `origin/main`.",
-    nextAction: "Verify the trust and polish layer, then publish a fresh Phase 6 PR.",
+    currentTask: "Build Agent OS Phase 7 so Mission Control can pause, resume, and hand off work with review-ready packets.",
+    lastAction: "Confirmed Phase 6 PR #8 is merged into `main` and started Phase 7 from fresh `origin/main`.",
+    nextAction: "Verify the handoff layer, then publish a fresh Phase 7 PR.",
     risk: "Low",
     telemetry: [
       { label: "Mode", value: "Repo execution" },
@@ -442,12 +471,12 @@ export const agentStatuses: AgentStatus[] = [
     role: "Senior full-stack delivery lane",
     state: "Executing",
     project: "Mission Control",
-    currentTask: "Implement Phase 6 from fresh `origin/main` on `thor/agent-os-phase6`.",
-    lastAction: "Created the Phase 6 branch from fresh main after Phase 5 merged.",
-    nextAction: "Run lint, typecheck, build, smoke, push, and open the Phase 6 PR.",
+    currentTask: "Implement Phase 7 from fresh `origin/main` on `thor/agent-os-phase7`.",
+    lastAction: "Created the Phase 7 branch from fresh main after Phase 6 merged.",
+    nextAction: "Run lint, typecheck, build, smoke, push, and open the Phase 7 PR.",
     risk: "Medium",
     telemetry: [
-      { label: "Branch", value: "thor/agent-os-phase6" },
+      { label: "Branch", value: "thor/agent-os-phase7" },
       { label: "Base", value: "origin/main" },
       { label: "Deploy", value: "Vercel preview" },
     ],
@@ -473,35 +502,35 @@ export const agentStatuses: AgentStatus[] = [
 export const operatingTasks: OperatingTask[] = [
   {
     id: "task-mission-control-agent-os",
-    title: "Mission Control Agent OS Phase 6",
+    title: "Mission Control Agent OS Phase 7",
     owner: "Thor",
     lane: "Active",
     project: "Mission Control",
     summary:
-      "Add trust indicators, audit logs, polished states, responsive checks, and provenance for generated suggestions.",
+      "Add handoff packets, pause/resume markers, and operating cadences for controlled project switching.",
     blocker: "None. Fresh PR required before handoff.",
-    nextAction: "Verify Phase 6 trust and polish surfaces and publish a fresh PR for review.",
+    nextAction: "Verify Phase 7 handoff surfaces and publish a fresh PR for review.",
     evidence: [
-      "Branch cut from merged Phase 5 `origin/main`",
-      "Trust route adds auditability, provenance, state feedback, and responsive readiness",
+      "Branch cut from merged Phase 6 `origin/main`",
+      "Handoff route adds review packets, pause/resume markers, and cadence outputs",
       "PR gate remains mandatory before handoff",
     ],
   },
   {
     id: "task-nimet-lexical-deploy",
-    title: "NiMet Lexical editor deployment",
+    title: "NiMet OnePortal editor lane",
     owner: "Thor",
     lane: "Paused",
     project: "NiMet OnePortal",
     summary:
-      "PR #45 is merged, but the live containers are stale because the VPS deploy failed before rollout.",
-    blocker: "VPS root disk is full: 15G total, 15G used, 0 available.",
+      "NiMet Thor work is intentionally paused after the New Document font-selection PR was published.",
+    blocker: "Paused by Rex so Mission Control Agent OS Phase 7 can move next.",
     nextAction:
-      "When NiMet resumes, free safe disk space, rerun deploy to `858bbb3`, then verify `/apps/documents/new`.",
+      "Resume only when Rex explicitly switches back to NiMet, then continue from PR #50 and the authenticated editor smoke trail.",
     evidence: [
-      "`last_deployed_sha` still at PR #44 `b99cc56`",
-      "`nimet-oneportal-deploy.service` failed with out-of-diskspace",
-      "Lexical files are present in VPS checkout but not confirmed live",
+      "PR #50 opened for New Document font selection",
+      "Authenticated editor browser smoke passed",
+      "Do not merge NiMet automatically",
     ],
   },
   {
@@ -621,15 +650,15 @@ export const continuityRecords: ContinuityRecord[] = [
     id: "continuity-active-lane",
     label: "Active lane",
     source: "Current request",
-    state: "Mission Control Agent OS Phase 6",
+    state: "Mission Control Agent OS Phase 7",
     next: "Make Job Hunt and Content pipelines live, actionable modules.",
   },
   {
     id: "continuity-nimet",
     label: "Paused lane",
-    source: "memory/tasks.md",
-    state: "NiMet OnePortal paused at deploy blocker.",
-    next: "Free VPS disk, redeploy PR #45, verify Lexical editor.",
+    source: "memory/tasks.md + Rex pause instruction",
+    state: "NiMet OnePortal paused after PR #50 font-selection work.",
+    next: "Resume only on explicit NiMet instruction; keep PR #50 and authenticated smoke evidence as the handoff point.",
   },
   {
     id: "continuity-tools",
@@ -727,7 +756,7 @@ export const commandRunbooks: CommandRunbook[] = [
 export const dispatchQueue: DispatchQueueItem[] = [
   {
     id: "dispatch-agent-os-phase2",
-    title: "Mission Control Agent OS Phase 6",
+    title: "Mission Control Agent OS Phase 7",
     agent: "Thor",
     priority: "P1",
     readiness: "Ready",
@@ -759,7 +788,7 @@ export const publicationPipeline: PublicationPipelineItem[] = [
     id: "pipeline-scope",
     label: "Scope",
     status: "Done",
-    detail: "Phase 6 is limited to polish, mobile responsiveness, trust indicators, state feedback, and action-log auditability.",
+    detail: "Phase 7 is limited to handoff packets, pause/resume markers, operating cadence, and review boundaries.",
   },
   {
     id: "pipeline-verify",
@@ -771,7 +800,7 @@ export const publicationPipeline: PublicationPipelineItem[] = [
     id: "pipeline-pr",
     label: "Publish",
     status: "Next",
-    detail: "Push `thor/agent-os-phase6` and open a PR against `main` for review.",
+    detail: "Push `thor/agent-os-phase7` and open a PR against `main` for review.",
   },
 ];
 
@@ -1435,17 +1464,17 @@ export const productionStages: ProductionStage[] = [
 ];
 
 export const orchestrationTimeline: OrchestrationTimelineItem[] = [
-  { id: "orch-phase5", time: "Now", module: "Agent OS", title: "Phase 6 trust layer in build", summary: "Agent OS cockpit now layers polish, provenance, auditability, and responsive trust cues onto orchestration.", signal: "Decision", relatedHref: "/agent-os" },
+  { id: "orch-phase5", time: "Now", module: "Agent OS", title: "Phase 7 handoff layer in build", summary: "Agent OS cockpit now layers handoff packets, pause markers, and operating cadence onto trust.", signal: "Decision", relatedHref: "/agent-os" },
   { id: "orch-approval-health", time: "08:03", module: "Approvals", title: "Role hunt connector degraded", summary: "Workflow health flagged Tavily auth drift and attached remediation before the next weekday automation run.", signal: "Risk", relatedHref: "/approvals" },
   { id: "orch-calendar-gallery", time: "Today", module: "Calendar", title: "Birthday content planning needs gallery lock", summary: "Calendar prep and content pipeline both point to confirming Moeshen Art Gallery access before May 8.", signal: "Next action", relatedHref: "/calendar" },
-  { id: "orch-nimet-memory", time: "Paused", module: "Projects", title: "NiMet deploy remains blocked", summary: "Memory-backed continuity keeps the VPS disk-full blocker visible without restarting production work prematurely.", signal: "Memory", relatedHref: "/projects?project=nimet-oneportal" },
+  { id: "orch-nimet-memory", time: "Paused", module: "Projects", title: "NiMet editor lane paused", summary: "Memory-backed continuity keeps PR #50 and the authenticated smoke trail visible without restarting OnePortal work prematurely.", signal: "Memory", relatedHref: "/projects?project=nimet-oneportal" },
   { id: "orch-job-content", time: "Weekly", module: "Job Hunt", title: "Role hunt output can fuel content angle", summary: "Remote-role positioning insights should feed a content asset after the weekly shortlist review.", signal: "Next action", relatedHref: "/job-hunt" },
 ];
 
 export const recommendationItems: RecommendationItem[] = [
   { id: "rec-gallery", priority: "P1", title: "Confirm birthday content shoot access", why: "Projects, Calendar, and Content all reference the May 8 deadline, so this is the highest cross-module unblock.", action: "Open the gallery prep workflow and draft the booking message.", sourceModules: ["Projects", "Calendar", "Content"] },
   { id: "rec-role-connector", priority: "P2", title: "Repair role-hunt search connector before next cron", why: "Phase 4 health shows degraded Tavily auth; the next weekday run will repeat the fallback unless credentials are ready.", action: "Stage connector readiness check from Workflow Health.", sourceModules: ["Approvals", "Job Hunt", "Agent OS"] },
-  { id: "rec-nimet-pause", priority: "P3", title: "Keep NiMet paused, but preserve resume path", why: "Memory says the production blocker is environmental, not a code issue. Surfacing it prevents false green status.", action: "Leave blocked until Rex explicitly resumes disk cleanup.", sourceModules: ["Projects", "Memory", "Agent OS"] },
+  { id: "rec-nimet-pause", priority: "P3", title: "Keep NiMet paused, but preserve resume path", why: "Rex explicitly paused OnePortal work after the font-selection PR so Mission Control can move next.", action: "Leave paused until Rex explicitly resumes NiMet from PR #50.", sourceModules: ["Projects", "Memory", "Agent OS"] },
 ];
 
 export const unifiedSearchItems: UnifiedSearchItem[] = [
@@ -1457,8 +1486,8 @@ export const unifiedSearchItems: UnifiedSearchItem[] = [
 ];
 
 export const memoryAwareSummaries: MemoryAwareSummary[] = [
-  { id: "memory-active-lane", title: "Active lane", source: "Current assignment + PR state", summary: "Phase 6 starts from merged main after orchestration landed, so trust and polish can stabilize the full Agent OS surface.", confidence: "High", nextUse: "Use as PR base and cockpit status." },
-  { id: "memory-nimet", title: "Paused production blocker", source: "memory/tasks.md", summary: "NiMet Lexical code is merged, but deployment waits on VPS disk cleanup and redeploy verification.", confidence: "High", nextUse: "Recommend pause, not code churn." },
+  { id: "memory-active-lane", title: "Active lane", source: "Current assignment + PR state", summary: "Phase 7 starts from merged main after trust landed, so handoffs can stabilize project switching and review.", confidence: "High", nextUse: "Use as PR base, pause marker, and review handoff status." },
+  { id: "memory-nimet", title: "Paused OnePortal lane", source: "memory/tasks.md + PR #50", summary: "NiMet editor font selection is review-ready, and Rex paused the lane before any further OnePortal work.", confidence: "High", nextUse: "Resume from PR #50 only when Rex switches back." },
   { id: "memory-role-hunt", title: "Recurring automation caveat", source: "Workflow health + tool memory", summary: "Role hunt automation is useful, but connector auth drift must be visible before the next weekday run.", confidence: "Medium", nextUse: "Guide connector readiness recommendation." },
 ];
 
@@ -1482,10 +1511,10 @@ export const trustSignals: TrustSignal[] = [
 ];
 
 export const actionLogEntries: ActionLogEntry[] = [
-  { id: "log-phase6-start", time: "18:13", actor: "Thor", action: "Started Agent OS Phase 6 from fresh origin/main", surface: "Repo", outcome: "Recorded", evidence: "Branch thor/agent-os-phase6 created after PR #7 merged." },
-  { id: "log-phase5-merge", time: "17:58", actor: "Thor", action: "Phase 5 orchestration merged into main", surface: "GitHub", outcome: "Verified", evidence: "origin/main includes /orchestration and Agent OS Phase 5 state." },
+  { id: "log-phase6-start", time: "18:13", actor: "Thor", action: "Started Agent OS Phase 7 from fresh origin/main", surface: "Repo", outcome: "Recorded", evidence: "Branch thor/agent-os-phase7 created after PR #7 merged." },
+  { id: "log-phase5-merge", time: "17:58", actor: "Thor", action: "Phase 6 trust layer merged into main", surface: "GitHub", outcome: "Verified", evidence: "origin/main includes /trust and Agent OS Phase 6 state." },
   { id: "log-workflow-health", time: "08:03", actor: "Automation", action: "Connector degradation surfaced", surface: "Approvals", outcome: "Staged", evidence: "Workflow health recommends Tavily readiness repair before next cron." },
-  { id: "log-nimet", time: "Paused", actor: "StarLord", action: "Preserved NiMet deploy blocker", surface: "Projects", outcome: "Blocked", evidence: "VPS disk-full blocker remains visible until Rex resumes production work." },
+  { id: "log-nimet", time: "Paused", actor: "StarLord", action: "Preserved NiMet PR #50 handoff", surface: "Projects", outcome: "Staged", evidence: "Font-selection PR and authenticated smoke trail remain the resume point." },
 ];
 
 export const productStateCards: ProductStateCard[] = [
@@ -1506,6 +1535,95 @@ export const designSystemTokens: DesignSystemToken[] = [
   { id: "token-density", label: "Spacing scale", value: "10 / 14 / 18 / 24", purpose: "Predictable rhythm across cockpit, orchestration, and trust surfaces." },
   { id: "token-evidence", label: "Evidence chips", value: "confidence + provenance", purpose: "Generated suggestions explain where their guidance came from." },
   { id: "token-state", label: "State colors", value: "good / warning / risk", purpose: "Health, readiness, and audit outcomes reuse one visual grammar." },
+];
+
+
+export const handoffPackets: HandoffPacket[] = [
+  {
+    id: "handoff-phase7-pr",
+    title: "Mission Control Agent OS Phase 7",
+    owner: "Thor",
+    state: "Ready",
+    summary: "Package the current implementation into a reviewable PR with scope, verification, route smoke, and next-resume notes attached.",
+    includes: ["Branch and base", "Verification commands", "Route smoke evidence", "Non-merge handoff boundary"],
+    nextAction: "Open the Phase 7 PR against main and leave merge control with Rex.",
+  },
+  {
+    id: "handoff-nimet-pause",
+    title: "NiMet OnePortal pause packet",
+    owner: "StarLord",
+    state: "Paused",
+    summary: "NiMet work is intentionally paused after PR #50 so Mission Control can move without contaminating lanes.",
+    includes: ["Latest PR", "Verified editor smoke", "Resume branch", "Do-not-merge boundary"],
+    nextAction: "Resume only when Rex explicitly switches back to NiMet.",
+  },
+  {
+    id: "handoff-review-loop",
+    title: "Rex review loop",
+    owner: "Rex",
+    state: "In review",
+    summary: "Reviewable work should arrive with enough context to merge, reject, or ask for the next slice without replaying chat history.",
+    includes: ["What changed", "Why it matters", "Evidence", "Open decisions"],
+    nextAction: "Use handoff packets as the default PR review summary format.",
+  },
+];
+
+export const pauseResumeMarkers: PauseResumeMarker[] = [
+  {
+    id: "pause-nimet-oneportal",
+    project: "NiMet OnePortal",
+    status: "Paused",
+    reason: "Rex explicitly paused NiMet Thor work after the font-selection PR.",
+    resumeWhen: "Rex asks to continue NiMet, deploy PR #50, or inspect OnePortal again.",
+    preservedContext: ["PR #50 is open for font selection", "Authenticated editor smoke passed", "Do not merge automatically"],
+  },
+  {
+    id: "resume-mission-control",
+    project: "Mission Control",
+    status: "Active",
+    reason: "Agent OS Phase 7 is now the active execution lane.",
+    resumeWhen: "Continue from fresh main after Phase 6 merged, then publish a Phase 7 PR.",
+    preservedContext: ["Repo path: missioncontrol-agent-os-phase1", "Base branch: main", "PR gate required"],
+  },
+  {
+    id: "watch-thor-delivery",
+    project: "Thor runtime",
+    status: "Watch",
+    reason: "Native spawned task delivery is still unstable, so direct Thor runs remain the safe urgent execution path.",
+    resumeWhen: "A clean exact-marker spawned healthcheck passes after restart.",
+    preservedContext: ["Use direct agent assignment for urgent Thor work", "Do not call native spawn healthy prematurely"],
+  },
+];
+
+export const operatingCadenceItems: OperatingCadenceItem[] = [
+  {
+    id: "cadence-daily-command",
+    cadence: "Daily",
+    title: "Daily command brief",
+    signal: "Active priorities, calendar pressure, and blocked lanes.",
+    output: "A short ranked plan with evidence and one recommended next action.",
+  },
+  {
+    id: "cadence-pr-handoff",
+    cadence: "Per PR",
+    title: "Review handoff",
+    signal: "A reviewable branch is pushed and the completion gate passes.",
+    output: "PR link, changed surfaces, verification commands, and merge boundary.",
+  },
+  {
+    id: "cadence-resume",
+    cadence: "On resume",
+    title: "Lane resume brief",
+    signal: "Rex switches project context or says continue/still/again.",
+    output: "Project record, latest PR/deploy state, known blockers, and first safe command.",
+  },
+  {
+    id: "cadence-weekly-review",
+    cadence: "Weekly",
+    title: "Operating review",
+    signal: "Projects, job hunt, content, automations, and calendar all need one prioritization pass.",
+    output: "Decision packet separating execute-now, monitor, and pause lanes.",
+  },
 ];
 
 export const automationRunHistory: AutomationRunHistoryItem[] = [
@@ -1733,6 +1851,7 @@ export function getActiveModule(pathname: string): ModuleKey {
   if (pathname === "/approvals") return "approvals";
   if (pathname === "/orchestration") return "orchestration";
   if (pathname === "/trust") return "trust";
+  if (pathname === "/handoff") return "handoff";
   if (pathname === "/chat") return "chat";
   if (pathname === "/projects") return "projects";
   if (pathname === "/calendar") return "calendar";

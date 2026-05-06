@@ -5,11 +5,10 @@ import {
   connectorHealthSummaries,
   continuityRecords,
   dispatchQueue,
-  multiStepWorkflows,
+  handoffPackets,
   operatingTasks,
   publicationPipeline,
   readinessGates,
-  recommendationItems,
   skillRegistry,
   trustSignals,
 } from "@/components/mission-control-data";
@@ -37,14 +36,14 @@ export default function AgentOSPage() {
     <MissionControlLayout
       hero={
         <PageHero
-          copy="Agent OS Phase 6 keeps orchestration intact while adding the polish, mobile readiness, provenance, and auditability needed for daily trust."
+          copy="Agent OS Phase 7 keeps trust intact while adding handoff packets, pause/resume markers, and operating cadences so project switches stay controlled."
           eyebrow="Agent OS"
           metrics={[
             { label: "Active agents", value: String(activeAgents) },
             { label: "Trust signals", value: String(trustSignals.length) },
-            { label: "Recommendations", value: String(recommendationItems.length) },
+            { label: "Handoff packets", value: String(handoffPackets.length) },
           ]}
-          title="Agent OS now feels dependable enough for daily command-center use."
+          title="Agent OS now carries safe handoffs across active and paused work."
         />
       }
     >
@@ -54,12 +53,12 @@ export default function AgentOSPage() {
           <ReadinessGatesSection gates={readinessGates} />
           <CommandRunbooksSection runbooks={commandRunbooks} />
           <article className="panel-card phase-three-summary-panel">
-            <p className="eyebrow">Phase 6 trust layer</p>
-            <h2>Mission Control now exposes provenance, auditability, and responsive polish.</h2>
+            <p className="eyebrow">Phase 7 handoff layer</p>
+            <h2>Mission Control now preserves pause, resume, and review state.</h2>
             <p>
-              The trust layer adds confidence indicators, action logs, explicit state
-              feedback, and phone/laptop readiness cues on top of the Phase 5
-              orchestration command center.
+              The handoff layer packages review-ready work, paused project lanes,
+              and recurring operating cadence into visible packets on top of the
+              Phase 6 trust layer.
             </p>
             <div className="health-snapshot-grid">
               <div>
@@ -67,8 +66,8 @@ export default function AgentOSPage() {
                 <strong>{trustSignals.length}</strong>
               </div>
               <div>
-                <span>Workflows</span>
-                <strong>{multiStepWorkflows.length}</strong>
+                <span>Handoffs</span>
+                <strong>{handoffPackets.length}</strong>
               </div>
               <div>
                 <span>Health watches</span>
@@ -76,11 +75,11 @@ export default function AgentOSPage() {
               </div>
             </div>
             <div className="phase-three-link-row">
+              <Link className="detail-link" href="/handoff">
+                Open Handoff Layer
+              </Link>
               <Link className="detail-link" href="/trust">
                 Open Trust Layer
-              </Link>
-              <Link className="detail-link" href="/orchestration">
-                Open Orchestration Layer
               </Link>
               <Link className="detail-link" href="/approvals">
                 Open Workflow Health
