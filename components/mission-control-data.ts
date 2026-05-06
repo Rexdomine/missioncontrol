@@ -172,6 +172,42 @@ export interface ContinuityRecord {
   next: string;
 }
 
+export interface ReadinessGate {
+  id: string;
+  label: string;
+  owner: string;
+  status: "Ready" | "Watch" | "Blocked";
+  evidence: string;
+  action: string;
+}
+
+export interface CommandRunbook {
+  id: string;
+  title: string;
+  intent: string;
+  trigger: string;
+  agent: string;
+  mode: "Autonomous" | "Confirm first" | "Manual";
+  checks: string[];
+}
+
+export interface DispatchQueueItem {
+  id: string;
+  title: string;
+  agent: string;
+  priority: "P1" | "P2" | "P3";
+  readiness: "Ready" | "Needs confirmation" | "Blocked";
+  scope: string;
+  nextStep: string;
+}
+
+export interface PublicationPipelineItem {
+  id: string;
+  label: string;
+  status: "Done" | "Active" | "Next";
+  detail: string;
+}
+
 export const sidebarItems: SidebarItem[] = [
   { key: "today", label: "Today", href: "/", status: "live" },
   { key: "agent-os", label: "Agent OS", href: "/agent-os", status: "live" },
@@ -190,9 +226,9 @@ export const agentStatuses: AgentStatus[] = [
     role: "Primary orchestrator",
     state: "Executing",
     project: "Mission Control",
-    currentTask: "Build Agent OS Phase 1 and prepare a fresh PR for Vercel testing.",
-    lastAction: "Paused NiMet OnePortal with a durable deploy blocker pointer.",
-    nextAction: "Ship the Agent OS overview, timeline, lanes, skills registry, and continuity viewer.",
+    currentTask: "Build Agent OS Phase 2 and prepare the first combined PR for Vercel testing.",
+    lastAction: "Confirmed Agent OS Phase 1 is already on `origin/main` through PR #2.",
+    nextAction: "Ship command runbooks, readiness gates, dispatch controls, and the PR pipeline.",
     risk: "Low",
     telemetry: [
       { label: "Mode", value: "Repo execution" },
@@ -206,12 +242,12 @@ export const agentStatuses: AgentStatus[] = [
     role: "Senior full-stack delivery lane",
     state: "Executing",
     project: "Mission Control",
-    currentTask: "Implement reviewable frontend slice from clean `origin/main` worktree.",
-    lastAction: "Resolved repo state and isolated dirty legacy worktree from this branch.",
-    nextAction: "Run lint, typecheck, build, commit, push, and open a PR.",
+    currentTask: "Implement the Phase 2 control layer from clean `origin/main`.",
+    lastAction: "Created `thor/agent-os-phase2` after fetching the merged Agent OS Phase 1 baseline.",
+    nextAction: "Verify locally, run the completion gate, push, and open the Phase 2 PR.",
     risk: "Medium",
     telemetry: [
-      { label: "Branch", value: "thor/agent-os-phase1" },
+      { label: "Branch", value: "thor/agent-os-phase2" },
       { label: "Base", value: "origin/main" },
       { label: "Deploy", value: "Vercel preview" },
     ],
@@ -237,18 +273,18 @@ export const agentStatuses: AgentStatus[] = [
 export const operatingTasks: OperatingTask[] = [
   {
     id: "task-mission-control-agent-os",
-    title: "Mission Control Agent OS Phase 1",
+    title: "Mission Control Agent OS Phase 2",
     owner: "Thor",
     lane: "Active",
     project: "Mission Control",
     summary:
-      "Turn Mission Control into the operating console for agents, tasks, project state, skills, and continuity.",
+      "Move Agent OS from visibility into controlled execution with runbooks, readiness gates, dispatch state, and publication tracking.",
     blocker: "None. Fresh PR required before handoff.",
-    nextAction: "Publish the Phase 1 Agent OS branch for Vercel preview testing.",
+    nextAction: "Verify the Phase 2 control layer and publish the first Phase 2 PR.",
     evidence: [
-      "Clean worktree from `origin/main`",
-      "Frontend-only typed seed data",
-      "Verification gate planned before PR",
+      "Branch cut from merged `origin/main`",
+      "Frontend-only typed control model",
+      "PR gate remains mandatory before handoff",
     ],
   },
   {
@@ -292,10 +328,10 @@ export const activityTimeline: ActivityEvent[] = [
     time: "12:52",
     actor: "Thor",
     type: "Planning",
-    title: "Agent OS Phase 1 started",
+    title: "Agent OS Phase 2 started",
     detail:
-      "Mission Control lane selected and implementation scoped to visibility, continuity, and reviewable frontend surfaces.",
-    artifact: "Branch `thor/agent-os-phase1`",
+      "Mission Control lane selected and implementation scoped to command runbooks, safety gates, dispatch state, and reviewable publication flow.",
+    artifact: "Branch `thor/agent-os-phase2`",
   },
   {
     id: "activity-nimet-pause",
@@ -385,8 +421,8 @@ export const continuityRecords: ContinuityRecord[] = [
     id: "continuity-active-lane",
     label: "Active lane",
     source: "Current request",
-    state: "Mission Control Agent OS Phase 1",
-    next: "Implement and publish the Vercel-testable PR.",
+    state: "Mission Control Agent OS Phase 2",
+    next: "Turn the Agent OS from visibility into controlled execution.",
   },
   {
     id: "continuity-nimet",
@@ -400,7 +436,7 @@ export const continuityRecords: ContinuityRecord[] = [
     label: "Tool readiness",
     source: "TOOLS.md + memory/tools.md",
     state: "GitHub CLI is ready; NiMet SSH helper needs PATH-wrapped sshpass/ssh in this runtime.",
-    next: "Expose tool readiness in the Agent OS registry before deeper controls.",
+    next: "Use readiness gates before deeper execution controls mutate external systems.",
   },
   {
     id: "continuity-pr-rule",
@@ -408,6 +444,134 @@ export const continuityRecords: ContinuityRecord[] = [
     source: "Thor PR gate",
     state: "Every reviewable repo update ends in a fresh PR unless explicitly paused.",
     next: "Run verification and completion gate before handoff.",
+  },
+];
+
+export const readinessGates: ReadinessGate[] = [
+  {
+    id: "gate-project-context",
+    label: "Project lane resolved",
+    owner: "StarLord",
+    status: "Ready",
+    evidence: "Mission Control matched by Phase 2 cue, repo path, and active Agent OS branch.",
+    action: "Keep branch and PR state visible before repo execution starts.",
+  },
+  {
+    id: "gate-publication",
+    label: "PR publication path",
+    owner: "Thor",
+    status: "Ready",
+    evidence: "GitHub CLI auth is available and `origin/main` is the review base.",
+    action: "Open a fresh PR after lint, typecheck, build, and completion gate pass.",
+  },
+  {
+    id: "gate-browser",
+    label: "Visual smoke test",
+    owner: "Thor",
+    status: "Watch",
+    evidence: "Local HTTP route checks are reliable; screenshot runtime can need browser-lib repair.",
+    action: "Use build plus route smoke now, then restore screenshot checks as a follow-up.",
+  },
+  {
+    id: "gate-external-actions",
+    label: "External side effects",
+    owner: "StarLord",
+    status: "Ready",
+    evidence: "Phase 2 keeps execution controls local and does not send messages or mutate external systems.",
+    action: "Require confirmation before sensitive, destructive, public, or irreversible actions.",
+  },
+];
+
+export const commandRunbooks: CommandRunbook[] = [
+  {
+    id: "runbook-repo-slice",
+    title: "Ship a repo slice",
+    intent: "Move a scoped implementation from request to reviewable PR.",
+    trigger: "Rex asks Thor to implement, fix, or extend a project surface.",
+    agent: "Thor",
+    mode: "Autonomous",
+    checks: [
+      "Resolve project lane and base branch",
+      "Inspect dirty state before edits",
+      "Run lint, typecheck, build, and PR gate",
+    ],
+  },
+  {
+    id: "runbook-resume-blocker",
+    title: "Resume a paused blocker",
+    intent: "Pick up a known stalled lane without asking Rex to restate context.",
+    trigger: "A task says still, again, production, deploy, VPS, or blocked.",
+    agent: "StarLord",
+    mode: "Confirm first",
+    checks: [
+      "Recall memory and tool notes first",
+      "Separate code defects from environment defects",
+      "Ask only when the next action is sensitive or irreversible",
+    ],
+  },
+  {
+    id: "runbook-routine-ops",
+    title: "Run routine operations",
+    intent: "Handle low-risk checks, summaries, and upkeep quietly.",
+    trigger: "Heartbeat, cron follow-up, calendar review, or memory upkeep.",
+    agent: "StarLord",
+    mode: "Autonomous",
+    checks: [
+      "Use local files and tool state before web",
+      "Stay quiet when no user-facing signal changed",
+      "Capture durable decisions in memory",
+    ],
+  },
+];
+
+export const dispatchQueue: DispatchQueueItem[] = [
+  {
+    id: "dispatch-agent-os-phase2",
+    title: "Mission Control Agent OS Phase 2",
+    agent: "Thor",
+    priority: "P1",
+    readiness: "Ready",
+    scope: "Frontend Agent OS controls, readiness gates, command runbooks, and publication pipeline.",
+    nextStep: "Verify locally, push a fresh branch, and open the first Phase 2 PR.",
+  },
+  {
+    id: "dispatch-nimet-recovery",
+    title: "NiMet deploy recovery",
+    agent: "Thor",
+    priority: "P2",
+    readiness: "Blocked",
+    scope: "VPS disk cleanup and redeploy after Rex chooses to resume the production lane.",
+    nextStep: "Keep blocker visible; do not mutate host state from Mission Control.",
+  },
+  {
+    id: "dispatch-role-hunt",
+    title: "Role hunt automation readiness",
+    agent: "StarLord",
+    priority: "P3",
+    readiness: "Needs confirmation",
+    scope: "Expose search connector readiness and next-run quality signals.",
+    nextStep: "Check connector state during the next scheduled run and record the outcome.",
+  },
+];
+
+export const publicationPipeline: PublicationPipelineItem[] = [
+  {
+    id: "pipeline-scope",
+    label: "Scope",
+    status: "Done",
+    detail: "Phase 2 is limited to controlled Agent OS execution surfaces with typed seed data.",
+  },
+  {
+    id: "pipeline-verify",
+    label: "Verify",
+    status: "Active",
+    detail: "Run lint, typecheck, build, and a local route smoke before publication.",
+  },
+  {
+    id: "pipeline-pr",
+    label: "Publish",
+    status: "Next",
+    detail: "Push `thor/agent-os-phase2` and open a PR against `main` for Vercel preview testing.",
   },
 ];
 
