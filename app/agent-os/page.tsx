@@ -7,11 +7,11 @@ import {
   dispatchQueue,
   multiStepWorkflows,
   operatingTasks,
-  orchestrationTimeline,
   publicationPipeline,
   readinessGates,
   recommendationItems,
   skillRegistry,
+  trustSignals,
 } from "@/components/mission-control-data";
 import Link from "next/link";
 import { MissionControlLayout, PageHero } from "@/components/mission-control-layout";
@@ -37,14 +37,14 @@ export default function AgentOSPage() {
     <MissionControlLayout
       hero={
         <PageHero
-          copy="Agent OS Phase 5 connects execution controls, workflow health, memory, recommendations, and guided workflows into one orchestration layer."
+          copy="Agent OS Phase 6 keeps orchestration intact while adding the polish, mobile readiness, provenance, and auditability needed for daily trust."
           eyebrow="Agent OS"
           metrics={[
             { label: "Active agents", value: String(activeAgents) },
-            { label: "Timeline signals", value: String(orchestrationTimeline.length) },
+            { label: "Trust signals", value: String(trustSignals.length) },
             { label: "Recommendations", value: String(recommendationItems.length) },
           ]}
-          title="Agent OS now guides action across every Mission Control module."
+          title="Agent OS now feels dependable enough for daily command-center use."
         />
       }
     >
@@ -54,17 +54,17 @@ export default function AgentOSPage() {
           <ReadinessGatesSection gates={readinessGates} />
           <CommandRunbooksSection runbooks={commandRunbooks} />
           <article className="panel-card phase-three-summary-panel">
-            <p className="eyebrow">Phase 5 orchestration</p>
-            <h2>Mission Control now has a cross-module command layer.</h2>
+            <p className="eyebrow">Phase 6 trust layer</p>
+            <h2>Mission Control now exposes provenance, auditability, and responsive polish.</h2>
             <p>
-              The orchestration layer adds a central timeline, recommendation tray,
-              unified command/search, memory-aware summaries, assistant guidance, and
-              staged multi-step workflows that can start from chat or cards.
+              The trust layer adds confidence indicators, action logs, explicit state
+              feedback, and phone/laptop readiness cues on top of the Phase 5
+              orchestration command center.
             </p>
             <div className="health-snapshot-grid">
               <div>
-                <span>Signals</span>
-                <strong>{orchestrationTimeline.length}</strong>
+                <span>Trust signals</span>
+                <strong>{trustSignals.length}</strong>
               </div>
               <div>
                 <span>Workflows</span>
@@ -76,14 +76,14 @@ export default function AgentOSPage() {
               </div>
             </div>
             <div className="phase-three-link-row">
+              <Link className="detail-link" href="/trust">
+                Open Trust Layer
+              </Link>
               <Link className="detail-link" href="/orchestration">
                 Open Orchestration Layer
               </Link>
               <Link className="detail-link" href="/approvals">
                 Open Workflow Health
-              </Link>
-              <Link className="detail-link" href="/job-hunt">
-                Open Job Hunt
               </Link>
             </div>
           </article>

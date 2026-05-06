@@ -7,6 +7,7 @@ export type ModuleKey =
   | "content"
   | "approvals"
   | "orchestration"
+  | "trust"
   | "chat";
 
 export interface SidebarItem {
@@ -364,6 +365,47 @@ export interface ContextualAssistantPanel {
   suggestedPrompt: string;
 }
 
+export interface TrustSignal {
+  id: string;
+  label: string;
+  status: "Verified" | "Watch" | "Needs review";
+  confidence: "High" | "Medium" | "Low";
+  provenance: string;
+  detail: string;
+}
+
+export interface ActionLogEntry {
+  id: string;
+  time: string;
+  actor: "Rex" | "StarLord" | "Thor" | "Automation";
+  action: string;
+  surface: string;
+  outcome: "Recorded" | "Staged" | "Blocked" | "Verified";
+  evidence: string;
+}
+
+export interface ProductStateCard {
+  id: string;
+  state: "Empty" | "Loading" | "Failure" | "Success";
+  surface: string;
+  message: string;
+  userFeedback: string;
+}
+
+export interface ResponsiveCheck {
+  id: string;
+  viewport: "Phone" | "Laptop" | "Desktop";
+  status: "Polished" | "Improved";
+  detail: string;
+}
+
+export interface DesignSystemToken {
+  id: string;
+  label: string;
+  value: string;
+  purpose: string;
+}
+
 export const sidebarItems: SidebarItem[] = [
   { key: "today", label: "Today", href: "/", status: "live" },
   { key: "agent-os", label: "Agent OS", href: "/agent-os", status: "live" },
@@ -373,6 +415,7 @@ export const sidebarItems: SidebarItem[] = [
   { key: "content", label: "Content", href: "/content", status: "live" },
   { key: "approvals", label: "Approvals", href: "/approvals", status: "live" },
   { key: "orchestration", label: "Orchestration", href: "/orchestration", status: "live" },
+  { key: "trust", label: "Trust", href: "/trust", status: "live" },
   { key: "chat", label: "Chat", href: "/chat", status: "live" },
 ];
 
@@ -383,9 +426,9 @@ export const agentStatuses: AgentStatus[] = [
     role: "Primary orchestrator",
     state: "Executing",
     project: "Mission Control",
-    currentTask: "Build Agent OS Phase 5 so Mission Control becomes an intelligent orchestration layer.",
-    lastAction: "Confirmed Phase 4 PR #5 is open and started stacked Phase 5 from `thor/agent-os-phase4`.",
-    nextAction: "Verify the orchestration layer, then publish a fresh stacked Phase 5 PR.",
+    currentTask: "Build Agent OS Phase 6 so Mission Control feels polished, mobile-ready, and trustworthy for daily use.",
+    lastAction: "Confirmed Phase 5 PR #7 is merged into `main` and started Phase 6 from fresh `origin/main`.",
+    nextAction: "Verify the trust and polish layer, then publish a fresh Phase 6 PR.",
     risk: "Low",
     telemetry: [
       { label: "Mode", value: "Repo execution" },
@@ -399,12 +442,12 @@ export const agentStatuses: AgentStatus[] = [
     role: "Senior full-stack delivery lane",
     state: "Executing",
     project: "Mission Control",
-    currentTask: "Implement Phase 5 from stacked `thor/agent-os-phase4` on `thor/agent-os-phase5`.",
-    lastAction: "Created the Phase 5 branch from open Phase 4 because the orchestration layer depends on workflow health.",
-    nextAction: "Run lint, typecheck, build, smoke, push, and open the stacked Phase 5 PR.",
+    currentTask: "Implement Phase 6 from fresh `origin/main` on `thor/agent-os-phase6`.",
+    lastAction: "Created the Phase 6 branch from fresh main after Phase 5 merged.",
+    nextAction: "Run lint, typecheck, build, smoke, push, and open the Phase 6 PR.",
     risk: "Medium",
     telemetry: [
-      { label: "Branch", value: "thor/agent-os-phase5" },
+      { label: "Branch", value: "thor/agent-os-phase6" },
       { label: "Base", value: "origin/main" },
       { label: "Deploy", value: "Vercel preview" },
     ],
@@ -430,17 +473,17 @@ export const agentStatuses: AgentStatus[] = [
 export const operatingTasks: OperatingTask[] = [
   {
     id: "task-mission-control-agent-os",
-    title: "Mission Control Agent OS Phase 5",
+    title: "Mission Control Agent OS Phase 6",
     owner: "Thor",
     lane: "Active",
     project: "Mission Control",
     summary:
-      "Add cross-module timeline, recommendations, unified search, memory-aware summaries, and guided workflows.",
+      "Add trust indicators, audit logs, polished states, responsive checks, and provenance for generated suggestions.",
     blocker: "None. Fresh PR required before handoff.",
-    nextAction: "Verify Phase 5 orchestration and publish a fresh stacked PR for review.",
+    nextAction: "Verify Phase 6 trust and polish surfaces and publish a fresh PR for review.",
     evidence: [
-      "Branch stacked from open Phase 4 `thor/agent-os-phase4`",
-      "Orchestration route connects modules, memory, and guided workflows",
+      "Branch cut from merged Phase 5 `origin/main`",
+      "Trust route adds auditability, provenance, state feedback, and responsive readiness",
       "PR gate remains mandatory before handoff",
     ],
   },
@@ -578,7 +621,7 @@ export const continuityRecords: ContinuityRecord[] = [
     id: "continuity-active-lane",
     label: "Active lane",
     source: "Current request",
-    state: "Mission Control Agent OS Phase 5",
+    state: "Mission Control Agent OS Phase 6",
     next: "Make Job Hunt and Content pipelines live, actionable modules.",
   },
   {
@@ -684,7 +727,7 @@ export const commandRunbooks: CommandRunbook[] = [
 export const dispatchQueue: DispatchQueueItem[] = [
   {
     id: "dispatch-agent-os-phase2",
-    title: "Mission Control Agent OS Phase 5",
+    title: "Mission Control Agent OS Phase 6",
     agent: "Thor",
     priority: "P1",
     readiness: "Ready",
@@ -716,7 +759,7 @@ export const publicationPipeline: PublicationPipelineItem[] = [
     id: "pipeline-scope",
     label: "Scope",
     status: "Done",
-    detail: "Phase 5 is limited to orchestration UI: timeline, recommendations, search, memory summaries, and staged workflows.",
+    detail: "Phase 6 is limited to polish, mobile responsiveness, trust indicators, state feedback, and action-log auditability.",
   },
   {
     id: "pipeline-verify",
@@ -728,7 +771,7 @@ export const publicationPipeline: PublicationPipelineItem[] = [
     id: "pipeline-pr",
     label: "Publish",
     status: "Next",
-    detail: "Push `thor/agent-os-phase5` and open a stacked PR against `thor/agent-os-phase4` for review.",
+    detail: "Push `thor/agent-os-phase6` and open a PR against `main` for review.",
   },
 ];
 
@@ -745,7 +788,7 @@ export const focusItems: FocusItem[] = [
     id: "focus-agent-os",
     title: "Mission Control Agent OS",
     detail:
-      "Ship the intelligent orchestration layer so StarLord can guide action across modules.",
+      "Ship the trust and polish layer so Mission Control feels dependable on desktop and mobile.",
     tag: "In Build",
     href: "/agent-os",
   },
@@ -1392,7 +1435,7 @@ export const productionStages: ProductionStage[] = [
 ];
 
 export const orchestrationTimeline: OrchestrationTimelineItem[] = [
-  { id: "orch-phase5", time: "Now", module: "Agent OS", title: "Phase 5 orchestration layer in build", summary: "Agent OS cockpit is moving from dashboards into guided action with recommendations and multi-step workflows.", signal: "Decision", relatedHref: "/agent-os" },
+  { id: "orch-phase5", time: "Now", module: "Agent OS", title: "Phase 6 trust layer in build", summary: "Agent OS cockpit now layers polish, provenance, auditability, and responsive trust cues onto orchestration.", signal: "Decision", relatedHref: "/agent-os" },
   { id: "orch-approval-health", time: "08:03", module: "Approvals", title: "Role hunt connector degraded", summary: "Workflow health flagged Tavily auth drift and attached remediation before the next weekday automation run.", signal: "Risk", relatedHref: "/approvals" },
   { id: "orch-calendar-gallery", time: "Today", module: "Calendar", title: "Birthday content planning needs gallery lock", summary: "Calendar prep and content pipeline both point to confirming Moeshen Art Gallery access before May 8.", signal: "Next action", relatedHref: "/calendar" },
   { id: "orch-nimet-memory", time: "Paused", module: "Projects", title: "NiMet deploy remains blocked", summary: "Memory-backed continuity keeps the VPS disk-full blocker visible without restarting production work prematurely.", signal: "Memory", relatedHref: "/projects?project=nimet-oneportal" },
@@ -1407,14 +1450,14 @@ export const recommendationItems: RecommendationItem[] = [
 
 export const unifiedSearchItems: UnifiedSearchItem[] = [
   { id: "search-workflow-health", label: "Workflow health", module: "approvals", href: "/approvals", keywords: ["approvals", "alerts", "connector", "cron"], summary: "Alert severity, run history, approval anomalies, and connector health." },
-  { id: "search-agent-os", label: "Agent OS cockpit", module: "agent-os", href: "/agent-os", keywords: ["agents", "tasks", "skills", "orchestration"], summary: "Execution controls, continuity, gates, and Phase 5 entry point." },
+  { id: "search-agent-os", label: "Agent OS cockpit", module: "agent-os", href: "/agent-os", keywords: ["agents", "tasks", "skills", "orchestration"], summary: "Execution controls, continuity, gates, orchestration, and trust entry points." },
   { id: "search-gallery", label: "Birthday content shoot", module: "projects", href: "/projects?project=birthday-content", keywords: ["gallery", "birthday", "content", "May 8"], summary: "Project and content prep for the gallery shoot." },
   { id: "search-role-hunt", label: "Remote role hunt", module: "job-hunt", href: "/job-hunt", keywords: ["jobs", "roles", "shortlist", "Tavily"], summary: "Daily/weekly role-search outputs and application pipeline." },
   { id: "search-command", label: "Command StarLord", module: "chat", href: "/chat", keywords: ["chat", "command", "workflow", "prompt"], summary: "Staged command surface for launching multi-step workflows." },
 ];
 
 export const memoryAwareSummaries: MemoryAwareSummary[] = [
-  { id: "memory-active-lane", title: "Active lane", source: "Current assignment + PR state", summary: "Phase 5 is stacked on open Phase 4 because orchestration depends on workflow-health surfaces.", confidence: "High", nextUse: "Use as PR base and cockpit status." },
+  { id: "memory-active-lane", title: "Active lane", source: "Current assignment + PR state", summary: "Phase 6 starts from merged main after orchestration landed, so trust and polish can stabilize the full Agent OS surface.", confidence: "High", nextUse: "Use as PR base and cockpit status." },
   { id: "memory-nimet", title: "Paused production blocker", source: "memory/tasks.md", summary: "NiMet Lexical code is merged, but deployment waits on VPS disk cleanup and redeploy verification.", confidence: "High", nextUse: "Recommend pause, not code churn." },
   { id: "memory-role-hunt", title: "Recurring automation caveat", source: "Workflow health + tool memory", summary: "Role hunt automation is useful, but connector auth drift must be visible before the next weekday run.", confidence: "Medium", nextUse: "Guide connector readiness recommendation." },
 ];
@@ -1429,6 +1472,40 @@ export const contextualAssistantPanels: ContextualAssistantPanel[] = [
   { id: "assistant-agent-os", module: "agent-os", title: "Agent OS guidance", guidance: "Use the cockpit to decide whether a task needs execution, monitoring, or memory continuity before opening a module.", suggestedPrompt: "What should move next across agents, projects, and workflow health?" },
   { id: "assistant-approvals", module: "approvals", title: "Workflow health guidance", guidance: "Treat alerts as source-linked diagnostics: resolve connector failures before escalating stale approval noise.", suggestedPrompt: "Explain which workflow health issue will become friction first." },
   { id: "assistant-content", module: "content", title: "Content guidance", guidance: "Connect content assets to calendar commitments so birthday shoot planning turns into published output.", suggestedPrompt: "Build the next content action from calendar and project context." },
+];
+
+export const trustSignals: TrustSignal[] = [
+  { id: "trust-pr-gate", label: "PR publication gate", status: "Verified", confidence: "High", provenance: "thor-pr-completion-gate.sh + GitHub PR state", detail: "Reviewable repo work remains clean, pushed, and attached to a fresh PR before completion." },
+  { id: "trust-memory", label: "Memory-backed summaries", status: "Verified", confidence: "High", provenance: "Mission Control seed data + durable task memory", detail: "Continuity cards separate durable blockers from transient dashboard state." },
+  { id: "trust-connector", label: "Connector health recommendations", status: "Watch", confidence: "Medium", provenance: "Phase 4 workflow health run history", detail: "Role-hunt connector guidance is visible with remediation, but live credential repair still needs operator approval." },
+  { id: "trust-sensitive-actions", label: "Sensitive action boundary", status: "Verified", confidence: "High", provenance: "Agent OS command gates", detail: "External sends, deploys, and destructive actions remain staged instead of auto-executed." },
+];
+
+export const actionLogEntries: ActionLogEntry[] = [
+  { id: "log-phase6-start", time: "18:13", actor: "Thor", action: "Started Agent OS Phase 6 from fresh origin/main", surface: "Repo", outcome: "Recorded", evidence: "Branch thor/agent-os-phase6 created after PR #7 merged." },
+  { id: "log-phase5-merge", time: "17:58", actor: "Thor", action: "Phase 5 orchestration merged into main", surface: "GitHub", outcome: "Verified", evidence: "origin/main includes /orchestration and Agent OS Phase 5 state." },
+  { id: "log-workflow-health", time: "08:03", actor: "Automation", action: "Connector degradation surfaced", surface: "Approvals", outcome: "Staged", evidence: "Workflow health recommends Tavily readiness repair before next cron." },
+  { id: "log-nimet", time: "Paused", actor: "StarLord", action: "Preserved NiMet deploy blocker", surface: "Projects", outcome: "Blocked", evidence: "VPS disk-full blocker remains visible until Rex resumes production work." },
+];
+
+export const productStateCards: ProductStateCard[] = [
+  { id: "state-empty", state: "Empty", surface: "Search results", message: "No matching module signal yet.", userFeedback: "Show useful query examples instead of a blank panel." },
+  { id: "state-loading", state: "Loading", surface: "Route transitions", message: "Preparing workspace context.", userFeedback: "Use a calm loading card with route and module language." },
+  { id: "state-failure", state: "Failure", surface: "Unknown routes", message: "Route not found.", userFeedback: "Send Rex back to Today with grounded recovery copy." },
+  { id: "state-success", state: "Success", surface: "Trust checks", message: "Evidence captured.", userFeedback: "Show confidence, provenance, and action-log evidence beside suggestions." },
+];
+
+export const responsiveChecks: ResponsiveCheck[] = [
+  { id: "responsive-phone", viewport: "Phone", status: "Improved", detail: "Sidebar becomes a compact horizontal rail, cards reduce padding, and tables collapse into readable rows." },
+  { id: "responsive-laptop", viewport: "Laptop", status: "Polished", detail: "Two-column operating layouts keep primary work and assistant rails balanced without crowding." },
+  { id: "responsive-desktop", viewport: "Desktop", status: "Polished", detail: "Hero metrics, timeline, recommendations, and trust panels retain hierarchy at wide widths." },
+];
+
+export const designSystemTokens: DesignSystemToken[] = [
+  { id: "token-radius", label: "Card radius", value: "18–28px", purpose: "Soft operating-system cards with consistent touch targets." },
+  { id: "token-density", label: "Spacing scale", value: "10 / 14 / 18 / 24", purpose: "Predictable rhythm across cockpit, orchestration, and trust surfaces." },
+  { id: "token-evidence", label: "Evidence chips", value: "confidence + provenance", purpose: "Generated suggestions explain where their guidance came from." },
+  { id: "token-state", label: "State colors", value: "good / warning / risk", purpose: "Health, readiness, and audit outcomes reuse one visual grammar." },
 ];
 
 export const automationRunHistory: AutomationRunHistoryItem[] = [
@@ -1655,6 +1732,7 @@ export function getActiveModule(pathname: string): ModuleKey {
   if (pathname === "/agent-os") return "agent-os";
   if (pathname === "/approvals") return "approvals";
   if (pathname === "/orchestration") return "orchestration";
+  if (pathname === "/trust") return "trust";
   if (pathname === "/chat") return "chat";
   if (pathname === "/projects") return "projects";
   if (pathname === "/calendar") return "calendar";
