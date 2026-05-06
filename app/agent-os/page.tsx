@@ -1,14 +1,16 @@
 import {
   activityTimeline,
   agentStatuses,
+  approvalAnomalyFeed,
+  automationRunHistory,
   commandRunbooks,
+  connectorHealthSummaries,
   continuityRecords,
   dispatchQueue,
-  contentIdeas,
-  jobRoles,
   operatingTasks,
   publicationPipeline,
   readinessGates,
+  severityAlerts,
   skillRegistry,
 } from "@/components/mission-control-data";
 import Link from "next/link";
@@ -29,20 +31,20 @@ export default function AgentOSPage() {
   const activeAgents = agentStatuses.filter((agent) => agent.state === "Executing").length;
   const pausedTasks = operatingTasks.filter((task) => task.lane === "Paused").length;
   const readySkills = skillRegistry.filter((skill) => skill.status === "Ready").length;
-  const activeContentAssets = contentIdeas.filter((idea) => idea.stage !== "Publish").length;
+  const unhealthyWorkflows = connectorHealthSummaries.filter((item) => item.status !== "Healthy").length;
 
   return (
     <MissionControlLayout
       hero={
         <PageHero
-          copy="Agent OS Phase 3 keeps execution controls visible while adding the two recurring personal-growth systems: remote role hunting and content production."
+          copy="Agent OS Phase 4 keeps execution controls and personal-growth pipelines visible while adding approvals, alerts, automation history, and workflow-health diagnostics."
           eyebrow="Agent OS"
           metrics={[
             { label: "Active agents", value: String(activeAgents) },
-            { label: "Tracked roles", value: String(jobRoles.length) },
-            { label: "Content assets", value: String(activeContentAssets) },
+            { label: "Workflow watches", value: String(unhealthyWorkflows) },
+            { label: "Alert signals", value: String(severityAlerts.length) },
           ]}
-          title="Agent OS now connects execution, job hunt, and content pipelines."
+          title="Agent OS now exposes workflow health before failures become friction."
         />
       }
     >
@@ -52,14 +54,31 @@ export default function AgentOSPage() {
           <ReadinessGatesSection gates={readinessGates} />
           <CommandRunbooksSection runbooks={commandRunbooks} />
           <article className="panel-card phase-three-summary-panel">
-            <p className="eyebrow">Phase 3 workflows</p>
-            <h2>Personal growth pipelines are now visible and actionable.</h2>
+            <p className="eyebrow">Phase 4 workflow health</p>
+            <h2>Approvals, alerts, and automation failures now have one diagnostic surface.</h2>
             <p>
-              Job Hunt and Content moved from queued routes into live operating modules with
-              scored roles, application stages, tailored angles, idea backlog, shoot state, and
-              publishing calendar.
+              The approvals module now includes alert severity, automation run history,
+              approval anomaly cards, and cron/connector health so stale noise and connector
+              failures are visible before they block Rex.
             </p>
+            <div className="health-snapshot-grid">
+              <div>
+                <span>Runs tracked</span>
+                <strong>{automationRunHistory.length}</strong>
+              </div>
+              <div>
+                <span>Anomalies</span>
+                <strong>{approvalAnomalyFeed.length}</strong>
+              </div>
+              <div>
+                <span>Health checks</span>
+                <strong>{connectorHealthSummaries.length}</strong>
+              </div>
+            </div>
             <div className="phase-three-link-row">
+              <Link className="detail-link" href="/approvals">
+                Open Workflow Health
+              </Link>
               <Link className="detail-link" href="/job-hunt">
                 Open Job Hunt
               </Link>

@@ -262,6 +262,52 @@ export interface ProductionStage {
   ideaIds: ContentIdea["id"][];
 }
 
+export interface AutomationRunHistoryItem {
+  id: string;
+  workflow: string;
+  source: string;
+  startedAt: string;
+  duration: string;
+  result: "Healthy" | "Degraded" | "Failed" | "Waiting";
+  trigger: string;
+  summary: string;
+  evidence: string[];
+  nextAction: string;
+}
+
+export interface ApprovalAnomaly {
+  id: string;
+  title: string;
+  severity: "Low" | "Medium" | "High" | "Critical";
+  source: string;
+  detectedAt: string;
+  staleFor: string;
+  impact: string;
+  remediationNotes: string[];
+  status: "Open" | "Watching" | "Resolved";
+}
+
+export interface ConnectorHealthSummary {
+  id: string;
+  name: string;
+  type: "Cron" | "Connector" | "Delivery" | "Runtime";
+  status: "Healthy" | "Watch" | "Failing";
+  lastCheck: string;
+  nextCheck: string;
+  summary: string;
+  owner: string;
+}
+
+export interface SeverityAlert {
+  id: string;
+  severity: "Info" | "Warning" | "Critical";
+  title: string;
+  source: string;
+  time: string;
+  body: string;
+  remediation: string;
+}
+
 export const sidebarItems: SidebarItem[] = [
   { key: "today", label: "Today", href: "/", status: "live" },
   { key: "agent-os", label: "Agent OS", href: "/agent-os", status: "live" },
@@ -280,13 +326,13 @@ export const agentStatuses: AgentStatus[] = [
     role: "Primary orchestrator",
     state: "Executing",
     project: "Mission Control",
-    currentTask: "Build Agent OS Phase 3 so job hunt and content systems become actionable modules.",
-    lastAction: "Confirmed Phase 2 PR #3 is merged into `main` and started Phase 3 from the fresh baseline.",
-    nextAction: "Verify the new Job Hunt and Content modules, then publish a fresh Phase 3 PR.",
+    currentTask: "Build Agent OS Phase 4 so approvals, alerts, automation history, and workflow health are actionable.",
+    lastAction: "Confirmed Phase 3 PR #4 is merged into `main` and started Phase 4 from the fresh baseline.",
+    nextAction: "Verify the workflow-health module, then publish a fresh Phase 4 PR.",
     risk: "Low",
     telemetry: [
       { label: "Mode", value: "Repo execution" },
-      { label: "Surface", value: "Job Hunt + Content" },
+      { label: "Surface", value: "Workflow health" },
       { label: "PR Gate", value: "Required" },
     ],
   },
@@ -296,12 +342,12 @@ export const agentStatuses: AgentStatus[] = [
     role: "Senior full-stack delivery lane",
     state: "Executing",
     project: "Mission Control",
-    currentTask: "Implement Phase 3 from clean `origin/main` on `thor/agent-os-phase3`.",
-    lastAction: "Created the Phase 3 branch after Phase 2 merged into main.",
-    nextAction: "Run lint, typecheck, build, smoke, push, and open the Phase 3 PR.",
+    currentTask: "Implement Phase 4 from clean `origin/main` on `thor/agent-os-phase4`.",
+    lastAction: "Created the Phase 4 branch after Phase 3 merged into main.",
+    nextAction: "Run lint, typecheck, build, smoke, push, and open the Phase 4 PR.",
     risk: "Medium",
     telemetry: [
-      { label: "Branch", value: "thor/agent-os-phase3" },
+      { label: "Branch", value: "thor/agent-os-phase4" },
       { label: "Base", value: "origin/main" },
       { label: "Deploy", value: "Vercel preview" },
     ],
@@ -327,17 +373,17 @@ export const agentStatuses: AgentStatus[] = [
 export const operatingTasks: OperatingTask[] = [
   {
     id: "task-mission-control-agent-os",
-    title: "Mission Control Agent OS Phase 3",
+    title: "Mission Control Agent OS Phase 4",
     owner: "Thor",
     lane: "Active",
     project: "Mission Control",
     summary:
-      "Turn the recurring job hunt and content workflows into visible, actionable Mission Control pipelines.",
+      "Expose approvals, alerts, automation history, and connector health so workflow failures are diagnosable in one place.",
     blocker: "None. Fresh PR required before handoff.",
-    nextAction: "Verify Phase 3 modules and publish a fresh PR for review.",
+    nextAction: "Verify Phase 4 modules and publish a fresh PR for review.",
     evidence: [
-      "Branch cut from merged Phase 2 `origin/main`",
-      "Job Hunt and Content routes moved from queued placeholders to live modules",
+      "Branch cut from merged Phase 3 `origin/main`",
+      "Approvals route upgraded into workflow-health diagnostics",
       "PR gate remains mandatory before handoff",
     ],
   },
@@ -475,7 +521,7 @@ export const continuityRecords: ContinuityRecord[] = [
     id: "continuity-active-lane",
     label: "Active lane",
     source: "Current request",
-    state: "Mission Control Agent OS Phase 3",
+    state: "Mission Control Agent OS Phase 4",
     next: "Make Job Hunt and Content pipelines live, actionable modules.",
   },
   {
@@ -581,12 +627,12 @@ export const commandRunbooks: CommandRunbook[] = [
 export const dispatchQueue: DispatchQueueItem[] = [
   {
     id: "dispatch-agent-os-phase2",
-    title: "Mission Control Agent OS Phase 3",
+    title: "Mission Control Agent OS Phase 4",
     agent: "Thor",
     priority: "P1",
     readiness: "Ready",
-    scope: "Job Hunt role pipeline plus Content production board and publishing calendar.",
-    nextStep: "Verify locally, push a fresh branch, and open the Phase 3 PR.",
+    scope: "Approvals route, alert severity feed, automation run ledger, and workflow health summaries.",
+    nextStep: "Verify locally, push a fresh branch, and open the Phase 4 PR.",
   },
   {
     id: "dispatch-nimet-recovery",
@@ -613,7 +659,7 @@ export const publicationPipeline: PublicationPipelineItem[] = [
     id: "pipeline-scope",
     label: "Scope",
     status: "Done",
-    detail: "Phase 3 is limited to actionable Job Hunt and Content workflow surfaces with typed seed data.",
+    detail: "Phase 4 is limited to workflow-health visibility: approvals, alerts, automation history, and connector diagnostics.",
   },
   {
     id: "pipeline-verify",
@@ -625,7 +671,7 @@ export const publicationPipeline: PublicationPipelineItem[] = [
     id: "pipeline-pr",
     label: "Publish",
     status: "Next",
-    detail: "Push `thor/agent-os-phase3` and open a PR against `main` for Vercel preview testing.",
+    detail: "Push `thor/agent-os-phase4` and open a PR against `main` for Vercel preview testing.",
   },
 ];
 
@@ -642,7 +688,7 @@ export const focusItems: FocusItem[] = [
     id: "focus-agent-os",
     title: "Mission Control Agent OS",
     detail:
-      "Ship the first operating-system layer for agents, task state, skills, activity, and continuity.",
+      "Ship approvals, alerts, automation history, and workflow health so silent failures become diagnosable.",
     tag: "In Build",
     href: "/agent-os",
   },
@@ -1197,7 +1243,7 @@ export const contentIdeas: ContentIdea[] = [
     stage: "Script",
     format: "Long-form",
     hook: "I stopped treating AI agents like chatbots and started building them an operating system.",
-    nextAction: "Turn the Mission Control Phase 3 PR into a 7-minute walkthrough outline.",
+    nextAction: "Turn the Mission Control Agent OS modules into a 7-minute walkthrough outline.",
   },
   {
     id: "idea-codex-thor-debug",
@@ -1285,6 +1331,164 @@ export const productionStages: ProductionStage[] = [
     title: "Edit / Publish",
     detail: "Assets moving through the final production and release queue.",
     ideaIds: ["idea-birthday-creative-bts", "idea-remote-role-positioning"],
+  },
+];
+
+export const automationRunHistory: AutomationRunHistoryItem[] = [
+  {
+    id: "run-role-hunt-0600",
+    workflow: "Weekday remote role hunt",
+    source: "OpenClaw scheduled automation",
+    startedAt: "Today 08:00",
+    duration: "14m",
+    result: "Degraded",
+    trigger: "Weekday cron",
+    summary: "Search pass completed with fallback research because Tavily auth was not ready in the runtime.",
+    evidence: ["Cron fired on schedule", "Manual scan fallback used", "Email delivery remained available"],
+    nextAction: "Reconnect Tavily before the next weekday run and compare shortlist quality.",
+  },
+  {
+    id: "run-memory-cleanup",
+    workflow: "Daily memory cleanup",
+    source: "StarLord proactive ops",
+    startedAt: "Today 05:10",
+    duration: "3m",
+    result: "Healthy",
+    trigger: "Daily cron",
+    summary: "Durable memory cleanup completed and no stale task records required escalation.",
+    evidence: ["Cleanup job completed", "No user-facing alert sent", "Task memory stayed readable"],
+    nextAction: "Keep monitoring for noisy approval prompts after recurring jobs.",
+  },
+  {
+    id: "run-nimet-deploy-check",
+    workflow: "NiMet deploy readiness check",
+    source: "Paused project monitor",
+    startedAt: "Yesterday 11:18",
+    duration: "8m",
+    result: "Failed",
+    trigger: "Manual recovery check",
+    summary: "VPS deployment could not proceed because the production host root disk was full.",
+    evidence: ["Root disk reported 100% used", "Deploy service failed", "Live marker stayed behind PR #45"],
+    nextAction: "Keep the lane paused until Rex resumes disk cleanup and redeploy.",
+  },
+];
+
+export const approvalAnomalyFeed: ApprovalAnomaly[] = [
+  {
+    id: "anomaly-telegram-approval-noise",
+    title: "Telegram approval prompts remained after cron maintenance",
+    severity: "High",
+    source: "OpenClaw cron maintenance",
+    detectedAt: "Today 05:18",
+    staleFor: "12h",
+    impact: "Approval noise can make Rex ignore the next real approval request.",
+    remediationNotes: [
+      "Group repeat prompts under one workflow-health card instead of chat spam.",
+      "Record the owning cron and last successful cleanup run.",
+      "Escalate only when the same source repeats after a healthy cleanup.",
+    ],
+    status: "Open",
+  },
+  {
+    id: "anomaly-role-hunt-auth",
+    title: "Search connector auth drift degraded role hunt output",
+    severity: "Medium",
+    source: "Tavily connector",
+    detectedAt: "Today 08:03",
+    staleFor: "1 run",
+    impact: "Shortlist quality is diagnosable, but recurring automation needs connector repair before the next send.",
+    remediationNotes: [
+      "Confirm runtime credentials before the next weekday cron window.",
+      "Keep manual fallback evidence attached to the run ledger.",
+    ],
+    status: "Watching",
+  },
+  {
+    id: "anomaly-nimet-disk",
+    title: "Paused deploy blocker still affects project continuity",
+    severity: "Medium",
+    source: "NiMet OnePortal VPS",
+    detectedAt: "Yesterday 11:18",
+    staleFor: "Paused",
+    impact: "Not active work today, but the workflow should not look green while production is blocked.",
+    remediationNotes: [
+      "Keep project lane paused until Rex resumes it.",
+      "When resumed, free safe disk space before rerunning deploy.",
+    ],
+    status: "Watching",
+  },
+];
+
+export const connectorHealthSummaries: ConnectorHealthSummary[] = [
+  {
+    id: "health-memory-cron",
+    name: "Daily memory cleanup",
+    type: "Cron",
+    status: "Healthy",
+    lastCheck: "Today 05:10",
+    nextCheck: "Tomorrow 05:10",
+    summary: "Cron completed and did not require user-facing intervention.",
+    owner: "StarLord",
+  },
+  {
+    id: "health-role-search",
+    name: "Role search connector",
+    type: "Connector",
+    status: "Watch",
+    lastCheck: "Today 08:00",
+    nextCheck: "Next weekday run",
+    summary: "Automation ran, but search auth drift forced a manual fallback path.",
+    owner: "StarLord",
+  },
+  {
+    id: "health-email-delivery",
+    name: "Email delivery",
+    type: "Delivery",
+    status: "Healthy",
+    lastCheck: "Today 08:14",
+    nextCheck: "Next scheduled send",
+    summary: "Delivery path is available for role-hunt summaries and operator digests.",
+    owner: "Automation",
+  },
+  {
+    id: "health-nimet-vps",
+    name: "NiMet deploy runtime",
+    type: "Runtime",
+    status: "Failing",
+    lastCheck: "Yesterday 11:18",
+    nextCheck: "When resumed",
+    summary: "VPS root disk is full, so deploy automation must remain blocked until cleanup.",
+    owner: "Thor",
+  },
+];
+
+export const severityAlerts: SeverityAlert[] = [
+  {
+    id: "severity-connector-watch",
+    severity: "Warning",
+    title: "Role hunt connector degraded this morning",
+    source: "Tavily connector",
+    time: "08:03",
+    body: "The weekday workflow produced a fallback result instead of a clean connector-backed search.",
+    remediation: "Reconnect credentials before the next weekday run.",
+  },
+  {
+    id: "severity-deploy-blocked",
+    severity: "Critical",
+    title: "Deploy runtime blocked by full disk",
+    source: "NiMet VPS",
+    time: "Yesterday",
+    body: "Production deploy checks remain failing while the root filesystem is full.",
+    remediation: "Do not rerun deploy until disk space is safely recovered.",
+  },
+  {
+    id: "severity-cleanup-ok",
+    severity: "Info",
+    title: "Daily memory cleanup stayed healthy",
+    source: "Memory cron",
+    time: "05:10",
+    body: "The cleanup cron completed, helping distinguish stale approval noise from a stuck task.",
+    remediation: "Keep monitoring for repeat approval prompts from the same source.",
   },
 ];
 
