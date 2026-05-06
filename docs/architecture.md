@@ -6,6 +6,7 @@ Mission Control is a visual operations dashboard for Rex and StarLord.
 
 It is the human-facing control plane for:
 
+- agent operations and task state
 - daily priorities
 - projects and decisions
 - calendar awareness
@@ -52,6 +53,7 @@ Version 2 is intentionally practical:
 Next.js routes and UI shells for:
 
 - Today
+- Agent OS
 - Projects
 - Calendar
 - Job Hunt
@@ -112,6 +114,23 @@ Primary UI:
 - top priorities strip
 - blockers and waiting-on cards
 - “ask StarLord” command box
+
+### Agent OS
+
+Purpose:
+
+- expose active agents and their current tasks
+- show paused work with exact resume points
+- surface skill, tool, and memory readiness
+- provide an audit-friendly operating timeline
+
+Primary UI:
+
+- agent operations center
+- work-in-motion task lanes
+- recent activity timeline
+- skills registry
+- continuity viewer
 
 ### Projects
 

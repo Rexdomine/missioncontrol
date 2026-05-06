@@ -3,12 +3,17 @@
 import Link from "next/link";
 import { useState } from "react";
 import type {
+  ActivityEvent,
+  AgentStatus,
   AgendaItem,
   AlertItem,
   ApprovalItem,
   ChatThread,
+  ContinuityRecord,
   FocusItem,
+  OperatingTask,
   ProjectPulseItem,
+  SkillRegistryItem,
 } from "./mission-control-data";
 
 export function SectionHeader({
@@ -249,6 +254,210 @@ export function ApprovalsSection({
       </div>
     </article>
   );
+}
+
+export function AgentOperationsSection({ agents }: { agents: AgentStatus[] }) {
+  return (
+    <article className="panel-card agent-ops-panel">
+      <SectionHeader
+        detail="A command-center view of what each agent is doing, what changed last, and what happens next."
+        eyebrow="Agents"
+        title="Operations center"
+      />
+      <div className="agent-grid">
+        {agents.map((agent) => (
+          <div className="agent-card" key={agent.id}>
+            <div className="agent-topline">
+              <div>
+                <p className="agent-role">{agent.role}</p>
+                <h3>{agent.name}</h3>
+              </div>
+              <span className={`status-pill ${statusTone(agent.state, agent.risk)}`}>
+                {agent.state}
+              </span>
+            </div>
+            <p className="agent-project">{agent.project}</p>
+            <p className="agent-task">{agent.currentTask}</p>
+            <div className="agent-motion">
+              <div>
+                <span>Last action</span>
+                <p>{agent.lastAction}</p>
+              </div>
+              <div>
+                <span>Next action</span>
+                <p>{agent.nextAction}</p>
+              </div>
+            </div>
+            <div className="agent-telemetry">
+              {agent.telemetry.map((item) => (
+                <div className="mini-metric" key={item.label}>
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+export function OperatingTasksSection({ tasks }: { tasks: OperatingTask[] }) {
+  return (
+    <article className="panel-card">
+      <SectionHeader
+        detail="One readable queue for active, paused, monitoring, and ready lanes."
+        eyebrow="Tasks"
+        title="Work in motion"
+      />
+      <div className="ops-task-list">
+        {tasks.map((task) => (
+          <div className="ops-task-card" key={task.id}>
+            <div className="ops-task-topline">
+              <div>
+                <p className="project-priority">{task.project}</p>
+                <h3>{task.title}</h3>
+              </div>
+              <span className={`status-pill ${taskTone(task.lane)}`}>{task.lane}</span>
+            </div>
+            <p className="detail-copy">{task.summary}</p>
+            <div className="ops-task-detail-grid">
+              <div>
+                <span>Owner</span>
+                <strong>{task.owner}</strong>
+              </div>
+              <div>
+                <span>Blocker</span>
+                <strong>{task.blocker}</strong>
+              </div>
+              <div>
+                <span>Next</span>
+                <strong>{task.nextAction}</strong>
+              </div>
+            </div>
+            <ul className="detail-list compact-list">
+              {task.evidence.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+export function ActivityTimelineSection({ events }: { events: ActivityEvent[] }) {
+  return (
+    <article className="panel-card">
+      <SectionHeader
+        detail="A human-readable ledger for commands, repo moves, memory updates, deploy checks, and automations."
+        eyebrow="Timeline"
+        title="Recent operating events"
+      />
+      <div className="os-timeline">
+        {events.map((event) => (
+          <div className="os-timeline-item" key={event.id}>
+            <time>{event.time}</time>
+            <div>
+              <div className="timeline-topline">
+                <h3>{event.title}</h3>
+                <span className="status-pill active">{event.type}</span>
+              </div>
+              <p>{event.detail}</p>
+              <div className="thread-meta">
+                {event.actor} · {event.artifact}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+export function SkillsRegistrySection({ skills }: { skills: SkillRegistryItem[] }) {
+  return (
+    <article className="panel-card">
+      <SectionHeader
+        detail="The installed operating capabilities that shape how work gets executed."
+        eyebrow="Skills"
+        title="Capability registry"
+      />
+      <div className="skills-grid">
+        {skills.map((skill) => (
+          <div className="skill-card" key={skill.id}>
+            <div className="skill-topline">
+              <div>
+                <p className="project-priority">{skill.category}</p>
+                <h3>{skill.name}</h3>
+              </div>
+              <span className={`status-pill ${skillStatusTone(skill.status)}`}>
+                {skill.status}
+              </span>
+            </div>
+            <p>{skill.purpose}</p>
+            <div className="thread-meta">Last used: {skill.lastUsed}</div>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+export function ContinuitySection({ records }: { records: ContinuityRecord[] }) {
+  return (
+    <article className="panel-card accent-card">
+      <SectionHeader
+        detail="The current memory-backed truth Mission Control should resume from."
+        eyebrow="Continuity"
+        title="Memory and project state"
+      />
+      <div className="continuity-list">
+        {records.map((record) => (
+          <div className="continuity-card" key={record.id}>
+            <div className="continuity-head">
+              <h3>{record.label}</h3>
+              <span>{record.source}</span>
+            </div>
+            <p>{record.state}</p>
+            <strong>{record.next}</strong>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function statusTone(state: AgentStatus["state"], risk: AgentStatus["risk"]) {
+  if (state === "Paused" || risk === "High") {
+    return "risk";
+  }
+  if (state === "Monitoring" || risk === "Medium") {
+    return "warning";
+  }
+  return "active";
+}
+
+function taskTone(lane: OperatingTask["lane"]) {
+  if (lane === "Paused") {
+    return "risk";
+  }
+  if (lane === "Monitoring") {
+    return "warning";
+  }
+  return "active";
+}
+
+function skillStatusTone(status: SkillRegistryItem["status"]) {
+  if (status === "Needs attention") {
+    return "risk";
+  }
+  if (status === "Queued") {
+    return "waiting";
+  }
+  return "good";
 }
 
 export function ThreadsSection({ threads }: { threads: ChatThread[] }) {

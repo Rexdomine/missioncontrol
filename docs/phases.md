@@ -54,6 +54,35 @@ Make Mission Control the practical home for execution planning.
 - Rex can track projects and upcoming commitments in one session
 - project and calendar context feel connected rather than siloed
 
+## Phase 2.5: Agent OS Phase 1
+
+### Goal
+
+Make Mission Control visibly operate as the control plane for StarLord, Thor, background automations, skills, project continuity, and task state.
+
+### Features
+
+- Agent OS route
+- agent operations center
+- active and paused task lanes
+- recent operating timeline
+- skills and tool readiness registry
+- memory-backed continuity viewer
+
+### UI
+
+- agent status cards with current task, last action, next action, and telemetry
+- task cards with blockers, evidence, and resume instructions
+- timeline cards for repo, deploy, memory, automation, and planning events
+- skills registry grouped by capability and readiness
+- continuity panel showing the current memory-backed truth
+
+### Success Criteria
+
+- Rex can see what the agent system is doing without reading chat logs
+- paused project lanes, especially NiMet, have clear resume points
+- future real telemetry can replace seed data without redesigning the screen
+
 ## Phase 3: Job Hunt and Content Pipelines
 
 ### Goal

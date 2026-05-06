@@ -22,8 +22,8 @@ export function MissionControlShell() {
     <MissionControlLayout
       hero={
         <PageHero
-          copy="Mission Control now covers the daily cockpit plus execution planning: active projects, calendar context, approvals visibility, and the command surface for direct work with StarLord."
-          eyebrow="Phase 2"
+          copy="Mission Control now covers the daily cockpit plus the first Agent OS layer: active agents, task lanes, project continuity, skills, approvals, and direct work with StarLord."
+          eyebrow="Agent OS Phase 1"
           metrics={[
             { label: "Focus Items", value: String(focusItems.length) },
             { label: "Agenda Items", value: String(agendaItems.length) },
@@ -32,7 +32,7 @@ export function MissionControlShell() {
               value: String(approvalItems.length + alerts.length),
             },
           ]}
-          title="Daily control plus connected project and calendar operations."
+          title="Daily control plus live visibility into the agent system."
         />
       }
     >
