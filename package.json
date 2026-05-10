@@ -14,7 +14,11 @@
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "typegen": "next typegen",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "job-outreach:health": "node scripts/job-outreach-health.mjs",
+    "job-outreach:sync-settings": "node scripts/sync-job-outreach-settings.mjs",
+    "job-outreach:source-apollo": "node scripts/apollo-source-job-outreach-leads.mjs",
+    "job-outreach:create-drafts": "node scripts/create-approved-gmail-drafts.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
