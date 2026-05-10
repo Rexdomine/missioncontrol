@@ -1,27 +1,24 @@
-import { applicationStages, jobHuntOutputs, jobRoles } from "@/components/mission-control-data";
+import { approvalItems } from "@/components/mission-control-data";
+import { JobOutreachMissionControl } from "@/components/job-outreach-mission-control";
 import { MissionControlLayout, PageHero } from "@/components/mission-control-layout";
-import { JobHuntPipelineModule } from "@/components/mission-control-phase-three";
 
 export default function JobHuntPage() {
-  const tailoringCount = jobRoles.filter((role) => role.stage === "Tailoring").length;
-  const readyOutputs = jobHuntOutputs.filter((output) => output.state === "Ready").length;
-
   return (
     <MissionControlLayout
       hero={
         <PageHero
-          copy="Phase 3 turns the remote-role hunt from recurring intent into an actionable pipeline: scored roles, application stages, tailored angles, and daily/weekly outputs now live in one module."
-          eyebrow="Job Hunt"
+          copy="Draft-only outbound job-search engine for Apollo-sourced hiring leads, AI scoring, personalized email approvals, Google Sheets tracking, reply handling, follow-ups, and Calendly interview conversion."
+          eyebrow="Job Outreach Mission Control"
           metrics={[
-            { label: "Tracked roles", value: String(jobRoles.length) },
-            { label: "Pipeline stages", value: String(applicationStages.length) },
-            { label: "Ready outputs", value: `${readyOutputs}/${jobHuntOutputs.length}` },
+            { label: "Mode", value: "Draft Only" },
+            { label: "Approval gates", value: String(approvalItems.length + 1) },
+            { label: "System of record", value: "Sheets" },
           ]}
-          title={`${tailoringCount} high-fit role needs tailoring now.`}
+          title="Interview Pipeline Mission Control is live in draft-only mode."
         />
       }
     >
-      <JobHuntPipelineModule />
+      <JobOutreachMissionControl />
     </MissionControlLayout>
   );
 }

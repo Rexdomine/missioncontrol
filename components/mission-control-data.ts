@@ -439,7 +439,7 @@ export const sidebarItems: SidebarItem[] = [
   { key: "agent-os", label: "Agent OS", href: "/agent-os", status: "live" },
   { key: "projects", label: "Projects", href: "/projects", status: "live" },
   { key: "calendar", label: "Calendar", href: "/calendar", status: "live" },
-  { key: "job-hunt", label: "Job Hunt", href: "/job-hunt", status: "live" },
+  { key: "job-hunt", label: "Job Outreach", href: "/job-hunt", status: "live" },
   { key: "content", label: "Content", href: "/content", status: "live" },
   { key: "approvals", label: "Approvals", href: "/approvals", status: "live" },
   { key: "orchestration", label: "Orchestration", href: "/orchestration", status: "live" },
