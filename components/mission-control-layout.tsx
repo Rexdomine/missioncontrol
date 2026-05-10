@@ -47,7 +47,7 @@ export function MissionControlLayout({
           </div>
           <div className="status-card">
             <strong>StarLord</strong>
-            <span>Agent OS Phase 7 active</span>
+            <span>Agent OS Phase 7 + Job Outreach MVP active</span>
           </div>
         </div>
       </aside>

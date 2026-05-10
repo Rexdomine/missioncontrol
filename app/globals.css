@@ -2114,3 +2114,174 @@ input:focus-visible {
     padding: 14px;
   }
 }
+
+.job-outreach-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.outreach-safety-panel {
+  background:
+    radial-gradient(circle at right top, rgba(15, 94, 82, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(255, 251, 245, 0.98), rgba(241, 250, 247, 0.95));
+}
+
+.outreach-guardrail-grid,
+.outreach-kpi-grid,
+.sheet-tab-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.outreach-guardrail-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.outreach-guardrail-grid strong {
+  display: block;
+  margin: 8px 0;
+  font-size: 1.35rem;
+  text-transform: capitalize;
+}
+
+.outreach-kpi-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.compact-metric strong {
+  font-size: 1.65rem;
+}
+
+.outreach-table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.outreach-row {
+  display: grid;
+  grid-template-columns: 1.25fr 70px 150px 1.25fr 120px;
+  gap: 12px;
+  align-items: center;
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(92, 74, 46, 0.09);
+}
+
+.outreach-row strong,
+.outreach-row span,
+.outreach-row em {
+  display: block;
+}
+
+.outreach-row div span,
+.outreach-row em {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-style: normal;
+  margin-top: 4px;
+}
+
+.outreach-row p {
+  margin: 0;
+  color: #344256;
+  line-height: 1.45;
+}
+
+.score-pill {
+  justify-self: start;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: var(--gold-soft);
+  color: #6a4309;
+  font-weight: 800;
+}
+
+.approval-draft-grid {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.approval-draft-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.draft-preview-card h3 {
+  margin: 8px 0 12px;
+}
+
+.draft-preview-card pre,
+.waiting-card pre {
+  margin: 12px 0 0;
+  white-space: pre-wrap;
+  font: 0.9rem/1.55 "Segoe UI", sans-serif;
+  color: #223247;
+  background: rgba(255, 251, 245, 0.84);
+  border: 1px solid rgba(92, 74, 46, 0.09);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.outreach-actions {
+  flex-wrap: wrap;
+}
+
+.sheet-tab-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sheet-tab-card,
+.daily-report-card {
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(92, 74, 46, 0.09);
+}
+
+.sheet-tab-card strong,
+.sheet-tab-card span {
+  display: block;
+}
+
+.sheet-tab-card span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.sheet-tab-card p,
+.daily-report-card p {
+  margin: 10px 0 0;
+  color: #344256;
+  line-height: 1.55;
+}
+
+.daily-report-card p:first-child {
+  margin-top: 0;
+}
+
+.waiting-card details {
+  margin-top: 12px;
+}
+
+.waiting-card summary {
+  cursor: pointer;
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+
+@media (max-width: 1120px) {
+  .outreach-guardrail-grid,
+  .outreach-kpi-grid,
+  .approval-draft-grid,
+  .sheet-tab-grid,
+  .outreach-row {
+    grid-template-columns: 1fr;
+  }
+}

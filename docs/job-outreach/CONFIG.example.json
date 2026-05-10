@@ -1,0 +1,20 @@
+{
+  "projectName": "Interview Pipeline Mission Control",
+  "mode": "draft_only",
+  "dailyLeadLimit": 50,
+  "dailySendLimit": 25,
+  "minimumScoreToDraft": 70,
+  "minimumScoreToAutoSend": 85,
+  "followUpDelays": { "first": 3, "second": 7, "final": 14 },
+  "sender": { "name": "Princewill Ejiogu", "email": "ADD_APPROVED_SENDER_EMAIL" },
+  "calendly": { "link": "ADD_CALENDLY_LINK" },
+  "apollo": { "enabled": true, "searchLimitPerRun": 50 },
+  "googleSheets": { "spreadsheetName": "Job Outreach Pipeline", "spreadsheetId": "ADD_SPREADSHEET_ID" },
+  "safety": {
+    "requireApprovalBeforeSend": true,
+    "respectSuppressionList": true,
+    "stopFollowUpsAfterReply": true,
+    "stopFollowUpsAfterOptOut": true,
+    "logEveryActivity": true
+  }
+}
