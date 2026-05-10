@@ -27,3 +27,18 @@ Draft-only MVP for a targeted interview outreach pipeline inside OpenClaw Missio
 - `lib/job-outreach/scoring.ts` — deterministic 0–100 lead scoring helper.
 - `components/job-outreach-mission-control.tsx` — Mission Control dashboard module.
 - `docs/job-outreach/CONFIG.example.json` — deploy/runtime config template.
+
+## Live connector commands
+
+All live commands load `/home/node/.openclaw/workspace/state/job-outreach-live.env` by default.
+
+```bash
+npm run job-outreach:health
+npm run job-outreach:sync-settings
+npm run job-outreach:source-apollo -- --limit 20          # dry-run
+npm run job-outreach:source-apollo -- --limit 20 --commit # writes Leads + Outreach Queue
+npm run job-outreach:create-drafts -- --max 5             # dry-run approved queue rows
+npm run job-outreach:create-drafts -- --max 5 --commit    # creates Gmail drafts only
+```
+
+The sourcing script refuses to run unless `JOB_OUTREACH_MODE=draft_only` and required live config is present. The Gmail script creates drafts only from `Approved` + `Draft Only` queue rows, checks suppression, and does not send email.
