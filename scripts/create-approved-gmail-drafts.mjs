@@ -156,8 +156,9 @@ for (const [index, row] of queueRows.entries()) {
   const messageId = sent.id || "sent";
   const sentAt = nowIso();
   const sentRow = [...row];
+  sentRow[8] = sentAt;
   sentRow[9] = "Sent";
-  sentRow[10] = `sent_at=${sentAt}; gmail_message_id=${messageId}`;
+  sentRow[10] = "";
   queueUpdates.push({ rowNumber, row: sentRow });
   emailActivity.push([`email_${crypto.randomUUID()}`, lead.id, lead.email, item.emailType, item.subject, sentAt, messageId, "Sent", "", `queue_id=${item.queueId}; cv_link=present`]);
   results.push({ queueId: item.queueId, to: lead.email, messageId, action: "sent", cvLink: "present" });
