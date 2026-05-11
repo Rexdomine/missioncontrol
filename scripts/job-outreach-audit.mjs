@@ -68,9 +68,19 @@ const queueRows = (tabs["Outreach Queue"] || []).slice(1);
 const emailRows = (tabs["Email Activity"] || []).slice(1);
 const followUpRows = (tabs["Follow Ups"] || []).slice(1);
 const suppressionRows = (tabs["Suppression List"] || []).slice(1);
+const replyRows = (tabs.Replies || []).slice(1);
+const interviewRows = (tabs.Interviews || []).slice(1);
 const suppressed = new Set(suppressionRows.map((row) => normalize(row[0])).filter(Boolean));
 const emailActivityByQueueId = new Map(emailRows.map((row) => [extractQueueId(rowValue(row, 9)), row]).filter(([queueId]) => queueId));
 const followUpsByLeadAndNumber = new Map(followUpRows.map((row) => [`${rowValue(row, 1)}|${rowValue(row, 2)}`, row]));
+const repliesByLead = new Map();
+for (const row of replyRows) {
+  const leadId = rowValue(row, 1);
+  if (!leadId) continue;
+  if (!repliesByLead.has(leadId)) repliesByLead.set(leadId, []);
+  repliesByLead.get(leadId).push(row);
+}
+const interviewsByLead = new Map(interviewRows.map((row) => [rowValue(row, 1), row]).filter(([leadId]) => leadId));
 
 for (const row of queueRows) {
   const queueId = rowValue(row, 0);
@@ -91,6 +101,29 @@ for (const row of queueRows) {
     if (!emailActivity) issue(issues, "critical", "email-activity", "Sent queue row has no Email Activity record", { queueId });
     if (lead && suppressed.has(normalize(lead[6]))) issue(issues, "critical", "suppression", "Sent lead is on suppression list", { queueId, leadId });
   }
+}
+
+for (const row of replyRows) {
+  const replyId = rowValue(row, 0);
+  const leadId = rowValue(row, 1);
+  const fromEmail = rowValue(row, 2);
+  const classification = rowValue(row, 5);
+  const nextAction = rowValue(row, 7);
+  const lead = leadById.get(leadId);
+  if (!lead) issue(issues, "high", "replies", "Reply row references missing lead", { replyId, leadId });
+  if (!fromEmail) issue(issues, "medium", "replies", "Reply row is missing From Email", { replyId, leadId });
+  if (!classification) issue(issues, "medium", "replies", "Reply row is missing classification", { replyId, leadId });
+  if (!nextAction) issue(issues, "medium", "replies", "Reply row is missing next action", { replyId, leadId });
+  if (classification === "Not Interested" && lead && !suppressed.has(normalize(lead[6]))) issue(issues, "high", "suppression", "Opt-out/not-interested reply is not in suppression list", { replyId, leadId, email: rowValue(lead, 6) });
+  if (classification === "Positive" && !interviewsByLead.has(leadId)) issue(issues, "medium", "interviews", "Positive reply has not been moved to interview/scheduling tracker", { replyId, leadId });
+}
+
+for (const row of followUpRows) {
+  const followUpId = rowValue(row, 0);
+  const leadId = rowValue(row, 1);
+  const status = rowValue(row, 4);
+  const replies = repliesByLead.get(leadId) || [];
+  if (replies.length && /^pending$/i.test(status)) issue(issues, "high", "follow-up", "Lead has replied but follow-up remains pending", { followUpId, leadId, replies: replies.length });
 }
 
 for (const row of emailRows) {
@@ -137,6 +170,8 @@ const report = {
     queue: queueRows.length,
     emailActivity: emailRows.length,
     followUps: followUpRows.length,
+    replies: replyRows.length,
+    interviews: interviewRows.length,
     suppression: suppressionRows.length,
   },
   issues,
