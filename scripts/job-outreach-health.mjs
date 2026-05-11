@@ -32,7 +32,7 @@ async function connectionStatus(app) {
 }
 
 async function sheetHeaderStatus(spreadsheetId) {
-  const ranges = ["'Leads'!A1:W1", "'Activity Log'!A1:G1", "'Daily Metrics'!A1:L1"];
+  const ranges = ["'Hiring Signals'!A1:P1", "'Leads'!A1:W1", "'Activity Log'!A1:G1", "'Daily Metrics'!A1:M1"];
   const checks = {};
   for (const range of ranges) {
     try {

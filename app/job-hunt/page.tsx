@@ -7,7 +7,7 @@ export default function JobHuntPage() {
     <MissionControlLayout
       hero={
         <PageHero
-          copy="Draft-only interview pipeline using Greenhouse and Lever public job APIs for active hiring signals, Findymail or LeadMagic for decision-makers, Hunter/Dropcontact verification fallback, Google Sheets tracking, Gmail drafts, and Calendly booking."
+          copy="Draft-only interview pipeline that separates Greenhouse/Lever hiring signals from contact-ready leads, enriches decision-makers with Findymail or LeadMagic, verifies with Hunter/Dropcontact, tracks in Google Sheets, queues Gmail drafts, and books via Calendly."
           eyebrow="Job Outreach Mission Control"
           metrics={[
             { label: "Mode", value: "Draft Only" },

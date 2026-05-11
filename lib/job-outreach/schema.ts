@@ -2,6 +2,27 @@ export const JOB_OUTREACH_SPREADSHEET_NAME = "Job Outreach Pipeline";
 
 export const jobOutreachTabs = [
   {
+    name: "Hiring Signals",
+    columns: [
+      "Signal ID",
+      "Date Found",
+      "Source",
+      "Company",
+      "Company Website",
+      "Company Domain",
+      "Job Title",
+      "Job URL",
+      "Location",
+      "Department",
+      "Hiring Signal",
+      "Target Role Match",
+      "Enrichment Status",
+      "Contacts Found",
+      "Lead IDs",
+      "Notes",
+    ],
+  },
+  {
     name: "Leads",
     columns: [
       "Lead ID",
@@ -123,7 +144,8 @@ export const jobOutreachTabs = [
     name: "Daily Metrics",
     columns: [
       "Date",
-      "Leads Sourced",
+      "Hiring Signals Found",
+      "Contactable Leads",
       "Qualified Leads",
       "Drafts Generated",
       "Emails Sent",
@@ -156,6 +178,8 @@ export const jobOutreachSettings = [
   ["Fallback Verification", "Hunter or Dropcontact"],
   ["Target Roles", "AI Native Fullstack Engineer, AI Engineer, Full Stack Engineer, Product Engineer, Founding Engineer"],
   ["Target Companies JSON", "ADD_GREENHOUSE_AND_LEVER_COMPANY_SLUGS"],
+  ["Lead Definition", "Contact-ready person with full name and email"],
+  ["Hiring Signal Definition", "Company/job opportunity before a contact is found"],
 ] as const;
 
 export const jobOutreachConfig = {
