@@ -23,8 +23,12 @@ async function requestJson(url, { method = "GET", body, headers = {} } = {}) {
 }
 
 async function connectionStatus(app) {
-  const data = await requestJson(`${CTRL_BASE}/connections?app=${encodeURIComponent(app)}&status=ACTIVE`);
-  return Array.isArray(data.connections) && data.connections.length > 0;
+  try {
+    const data = await requestJson(`${CTRL_BASE}/connections?app=${encodeURIComponent(app)}&status=ACTIVE`);
+    return { ok: Array.isArray(data.connections) && data.connections.length > 0 };
+  } catch (error) {
+    return { ok: false, detail: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 async function sheetHeaderStatus(spreadsheetId) {
@@ -33,9 +37,10 @@ async function sheetHeaderStatus(spreadsheetId) {
   for (const range of ranges) {
     try {
       const data = await requestJson(`${SHEETS_BASE}/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`);
-      checks[range] = { ok: (data.values?.[0] || []).length > 0, columns: (data.values?.[0] || []).length };
+      const columns = data.values?.[0] || [];
+      checks[range] = { ok: columns.length > 0, columns: columns.length };
     } catch (error) {
-      checks[range] = { ok: false, error: error.message };
+      checks[range] = { ok: false, columns: 0, detail: error instanceof Error ? error.message : String(error) };
     }
   }
   return checks;
@@ -49,18 +54,42 @@ async function publicApiStatus(config) {
     if (company.greenhouseBoardToken) providers.push("greenhouse");
     if (company.leverSlug) providers.push("lever");
   }
-  return { ok: providers.length > 0, state: providers.length ? "configured" : "missing_greenhouse_or_lever_slugs", providers: Array.from(new Set(providers)) };
+  return {
+    ok: providers.length > 0,
+    state: providers.length ? "configured" : "missing_greenhouse_or_lever_slugs",
+    providers: Array.from(new Set(providers)),
+  };
 }
 
-const { config, missing, ready } = validateLiveConfig({ allowMissingSourcingKeys: true });
+const { config, missing } = validateLiveConfig({ allowMissingSourcingKeys: true });
 const sourceKeys = {
   findymail: config.findymailApiKey ? "present" : "missing",
   leadMagic: config.leadMagicApiKey ? "present" : "missing",
   hunter: config.hunterApiKey ? "present" : "missing",
   dropcontact: config.dropcontactApiKey ? "present" : "missing",
 };
+const google = {
+  sheets: await connectionStatus("google-sheets"),
+  gmail: await connectionStatus("google-mail"),
+  calendar: await connectionStatus("google-calendar"),
+  drive: await connectionStatus("google-drive"),
+};
+const sheet = config.spreadsheetId ? await sheetHeaderStatus(config.spreadsheetId) : { ok: false, columns: 0 };
+const leadSources = await publicApiStatus(config);
+const primaryEnrichmentReady = Boolean(config.findymailApiKey || config.leadMagicApiKey);
+const sheetReady = Object.values(sheet).every((check) => check.ok);
+
 const report = {
-  ready: ready && config.mode === "draft_only",
+  ready:
+    missing.length === 0 &&
+    config.mode === "draft_only" &&
+    google.sheets.ok &&
+    google.gmail.ok &&
+    google.calendar.ok &&
+    google.drive.ok &&
+    sheetReady &&
+    leadSources.ok &&
+    primaryEnrichmentReady,
   missing,
   mode: config.mode,
   senderEmail: config.senderEmail || "missing",
@@ -68,21 +97,14 @@ const report = {
   calendlyLink: config.calendlyLink ? "present" : "missing",
   targetRoles: config.targetRoles,
   targetCompanies: config.targetCompanies.length,
-  leadSources: await publicApiStatus(config),
+  leadSources,
   enrichment: sourceKeys,
-  google: {
-    sheets: await connectionStatus("google-sheets"),
-    gmail: await connectionStatus("google-mail"),
-    calendar: await connectionStatus("google-calendar"),
-    drive: await connectionStatus("google-drive"),
-  },
-  sheet: config.spreadsheetId ? await sheetHeaderStatus(config.spreadsheetId) : { ok: false, columns: 0 },
+  google,
+  sheet,
 };
 
 console.log(JSON.stringify(report, null, 2));
 
-const primaryEnrichmentReady = Boolean(config.findymailApiKey || config.leadMagicApiKey);
-const sheetReady = Object.values(report.sheet).every((check) => check.ok);
-if (!report.google.sheets || !sheetReady || missing.length > 0 || !primaryEnrichmentReady || !report.leadSources.ok) {
+if (!report.ready) {
   process.exitCode = 1;
 }

@@ -56,3 +56,7 @@ npm run job-outreach:create-drafts -- --max 5 --commit    # creates Gmail drafts
 ```
 
 The sourcing script refuses to run unless `JOB_OUTREACH_MODE=draft_only` and required live config is present. The Gmail script creates drafts only from `Approved` + `Draft Only` queue rows, checks suppression, and does not send email.
+
+## Apollo plan requirement
+
+The health check validates actual Apollo people-search access, not just API-key authentication. If Apollo returns `API_INACCESSIBLE`, the key is valid but the current Apollo plan does not allow `mixed_people/search`; do not enable sourcing jobs until the Apollo plan/API access supports that endpoint or an approved export path is provided.
