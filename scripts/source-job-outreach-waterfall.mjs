@@ -144,16 +144,50 @@ async function sourceHiringSignals(config, limit) {
   return { jobs: results.slice(0, limit), events };
 }
 
-async function enrichWithFindymail(config, job) {
-  if (!config.findymailApiKey) return [];
-  const response = await fetch(`${config.findymailApiBase.replace(/\/$/, "")}/search/contacts`, {
+async function findymailJson(config, path, body) {
+  const response = await fetch(`${config.findymailApiBase.replace(/\/$/, "")}${path}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${config.findymailApiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ domain: job.companyDomain, company: job.companyName, titles: config.decisionMakerTitles }),
+    body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`Findymail enrichment failed: ${response.status} ${response.statusText}: ${await response.text()}`);
-  const data = await response.json();
-  return (data.contacts || data.results || []).map((contact) => ({ provider: "Findymail", ...contact }));
+  const text = await response.text();
+  let data;
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (!response.ok) throw new Error(`Findymail ${path} failed: ${response.status} ${response.statusText}: ${text}`);
+  return data;
+}
+
+async function enrichWithFindymail(config, job) {
+  if (!config.findymailApiKey || !job.companyDomain) return [];
+  const employees = await findymailJson(config, "/api/search/employees", {
+    website: job.companyDomain,
+    job_titles: config.decisionMakerTitles.slice(0, 10),
+    count: 2,
+  });
+  const people = Array.isArray(employees) ? employees : employees.data || employees.contacts || employees.results || [];
+  const contacts = [];
+  for (const person of people.slice(0, 2)) {
+    const name = person.name || person.fullName || [person.first_name, person.last_name].filter(Boolean).join(" ");
+    if (!name) continue;
+    let email = person.email || "";
+    if (!email) {
+      try {
+        const found = await findymailJson(config, "/api/search/name", { name, domain: job.companyDomain });
+        email = found.contact?.email || found.email || "";
+      } catch {
+        email = "";
+      }
+    }
+    contacts.push({
+      provider: "Findymail",
+      name,
+      email,
+      linkedinUrl: person.linkedinUrl || person.linkedin_url || "",
+      title: person.jobTitle || person.title || "Decision-maker",
+      company: job.companyName,
+    });
+  }
+  return contacts;
 }
 
 async function enrichWithLeadMagic(config, job) {

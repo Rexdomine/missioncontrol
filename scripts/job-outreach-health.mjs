@@ -50,7 +50,7 @@ async function publicApiStatus(config) {
   const companies = config.targetCompanies || [];
   if (!companies.length) return { ok: false, state: "missing_target_companies", providers: [] };
   const providers = [];
-  for (const company of companies.slice(0, 3)) {
+  for (const company of companies) {
     if (company.greenhouseBoardToken) providers.push("greenhouse");
     if (company.leverSlug) providers.push("lever");
   }
