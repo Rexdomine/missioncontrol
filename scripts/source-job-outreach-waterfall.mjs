@@ -470,9 +470,9 @@ async function enrichDecisionMakers(config, job) {
     return {
       contacts: [{
         provider: "Public Contact",
-        fullName: "Hiring Team",
-        firstName: "Hiring",
-        lastName: "Team",
+        fullName: "",
+        firstName: "",
+        lastName: "",
         email: job.publicContactEmail,
         linkedinUrl: "",
         title: "Hiring Team",
@@ -607,7 +607,7 @@ for (const job of jobs) {
     metrics.contactableLeads += 1;
 
     if (scored.score >= config.minimumScoreToDraft && !["invalid", "undeliverable", "risky"].includes(String(verification.state).toLowerCase())) {
-      const draft = buildInitialDraft({ firstName: person.firstName, company: person.company, title: person.title, angle, resumeUrl: config.resumeUrl });
+      const draft = buildInitialDraft({ firstName: person.firstName, fullName: person.fullName, email: person.email, company: person.company, title: person.title, angle, resumeUrl: config.resumeUrl });
       queue.push([`queue_${crypto.randomUUID()}`, id, scored.priority, "Initial", draft.subject, draft.body, "Pending", "Send on Approval", "", "Not Sent", ""]);
       metrics.queuedDrafts += 1;
     }

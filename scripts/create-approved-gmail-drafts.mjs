@@ -209,7 +209,7 @@ for (const { row, index } of prioritizedQueueRows) {
       processed += 1;
       continue;
     }
-    const draft = buildInitialDraft({ firstName: lead.firstName, company: lead.company, title: lead.title, angle: lead.personalizationAngle || lead.hiringSignal, resumeUrl: config.resumeUrl });
+    const draft = buildInitialDraft({ firstName: lead.firstName, fullName: lead.fullName, email: lead.email, company: lead.company, title: lead.title, angle: lead.personalizationAngle || lead.hiringSignal, resumeUrl: config.resumeUrl });
     const rewrittenRow = ensureLength(row, 11);
     rewrittenRow[4] = draft.subject;
     rewrittenRow[5] = draft.body;
