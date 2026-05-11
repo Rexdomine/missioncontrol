@@ -29,9 +29,44 @@ function parseJsonEnv(value, fallback) {
   if (!value) return fallback;
   try { return JSON.parse(value); } catch (error) { throw new Error(`Invalid JSON env value: ${error.message}`); }
 }
+function stripHtml(value = "") {
+  return String(value || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 function includesAny(text, needles) {
   const lower = String(text || "").toLowerCase();
   return needles.some((needle) => lower.includes(String(needle).toLowerCase()));
+}
+function publicEmailFromText(text = "") {
+  const blocked = /^(noreply|no-reply|donotreply|do-not-reply|support|privacy|legal|abuse|security)@/i;
+  return String(text || "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)?.find((email) => !blocked.test(email)) || "";
+}
+function firstUrlFromText(text = "") {
+  return String(text || "").match(/https?:\/\/[^\s<>)"]+/i)?.[0]?.replace(/[.,;]+$/, "") || "";
+}
+function opportunityScore(job, targetRoles) {
+  const haystack = [job.jobTitle, job.description, job.department, job.location, job.applyUrl, job.publicContactEmail].join(" ").toLowerCase();
+  let score = 20;
+  if (includesAny(haystack, targetRoles)) score += 30;
+  if (/ai|machine learning|llm|agent|automation/i.test(haystack)) score += 15;
+  if (/python|fastapi|django|flask/i.test(haystack)) score += 12;
+  if (/react|next\.js|typescript|frontend/i.test(haystack)) score += 12;
+  if (/full.?stack|product engineer|founding engineer/i.test(haystack)) score += 12;
+  if (/remote|worldwide|anywhere/i.test(haystack)) score += 8;
+  if (job.applyUrl || job.jobUrl) score += 6;
+  if (job.publicContactEmail) score += 10;
+  return Math.min(100, score);
+}
+function sourceJobKey(job) {
+  return [job.provider, job.companyName, job.jobTitle, job.jobUrl || job.applyUrl].map((part) => String(part || "").toLowerCase()).join("|");
 }
 function normalizeWebsite(urlOrDomain) {
   if (!urlOrDomain) return "";
@@ -74,7 +109,7 @@ async function appendRows(spreadsheetId, tab, rows) {
 }
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options);
+  const response = await fetch(url, { ...options, headers: { "User-Agent": "MissionControlJobOutreach/1.0", ...(options.headers || {}) } });
   const text = await response.text();
   let data;
   try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
@@ -86,23 +121,36 @@ function configuredCompanies(config) {
   return parseJsonEnv(process.env.JOB_OUTREACH_TARGET_COMPANIES_JSON, config.targetCompanies || []);
 }
 
+function normalizeJob(job, targetRoles) {
+  const score = opportunityScore(job, targetRoles);
+  return {
+    ...job,
+    applyUrl: job.applyUrl || job.jobUrl || "",
+    publicContactEmail: job.publicContactEmail || publicEmailFromText([job.description, job.raw?.text, job.raw?.description].join(" ")),
+    opportunityScore: score,
+  };
+}
+
 async function sourceGreenhouse(company, targetRoles, limit) {
   if (!company.greenhouseBoardToken) return [];
   const data = await fetchJson(`https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(company.greenhouseBoardToken)}/jobs?content=true`);
   return (data.jobs || [])
     .filter((job) => includesAny([job.title, job.content, job.location?.name].join(" "), targetRoles))
     .slice(0, limit)
-    .map((job) => ({
+    .map((job) => normalizeJob({
       provider: "Greenhouse",
       companyName: company.name || data.meta?.board_title || company.greenhouseBoardToken,
       companyWebsite: company.website || normalizeWebsite(company.domain),
       companyDomain: company.domain || domainFromWebsite(company.website),
       jobTitle: job.title || "Open role",
       jobUrl: job.absolute_url || "",
+      applyUrl: job.absolute_url || "",
+      publicContactEmail: publicEmailFromText(job.content),
       location: job.location?.name || "",
       department: job.departments?.map((dept) => dept.name).join(", ") || "",
+      description: stripHtml(job.content || ""),
       raw: job,
-    }));
+    }, targetRoles));
 }
 
 async function sourceLever(company, targetRoles, limit) {
@@ -111,29 +159,178 @@ async function sourceLever(company, targetRoles, limit) {
   return (Array.isArray(data) ? data : [])
     .filter((job) => includesAny([job.text, job.descriptionPlain, job.categories?.team, job.categories?.location].join(" "), targetRoles))
     .slice(0, limit)
-    .map((job) => ({
+    .map((job) => normalizeJob({
       provider: "Lever",
       companyName: company.name || company.leverSlug,
       companyWebsite: company.website || normalizeWebsite(company.domain),
       companyDomain: company.domain || domainFromWebsite(company.website),
       jobTitle: job.text || "Open role",
       jobUrl: job.hostedUrl || job.applyUrl || "",
+      applyUrl: job.applyUrl || job.hostedUrl || "",
+      publicContactEmail: publicEmailFromText(job.descriptionPlain || job.description || ""),
       location: job.categories?.location || "",
       department: job.categories?.team || "",
+      description: stripHtml(job.descriptionPlain || job.description || ""),
       raw: job,
-    }));
+    }, targetRoles));
+}
+
+async function sourceHimalayas(_config, targetRoles, limit) {
+  const data = await fetchJson(`https://himalayas.app/jobs/api?limit=${Math.min(100, Math.max(20, limit * 4))}`);
+  return (data.jobs || [])
+    .filter((job) => includesAny([job.title, job.excerpt, job.companyName, job.categories?.join(" "), job.description].join(" "), targetRoles))
+    .slice(0, limit)
+    .map((job) => normalizeJob({
+      provider: "Himalayas",
+      companyName: job.companyName || "Unknown company",
+      companyWebsite: job.companyWebsite ? normalizeWebsite(job.companyWebsite) : (job.companySlug ? `https://himalayas.app/companies/${job.companySlug}` : ""),
+      companyDomain: domainFromWebsite(job.companyWebsite || ""),
+      jobTitle: job.title || "Open role",
+      jobUrl: job.applicationLink || job.url || `https://himalayas.app/jobs/${job.slug || ""}`,
+      applyUrl: job.applicationLink || job.url || `https://himalayas.app/jobs/${job.slug || ""}`,
+      publicContactEmail: publicEmailFromText([job.description, job.excerpt].join(" ")),
+      location: Array.isArray(job.locationRestrictions) ? job.locationRestrictions.join(", ") : job.location || "Remote",
+      department: Array.isArray(job.categories) ? job.categories.join(", ") : "",
+      description: stripHtml([job.excerpt, job.description].join(" ")),
+      raw: job,
+    }, targetRoles));
+}
+
+async function sourceRemotive(_config, targetRoles, limit) {
+  const data = await fetchJson(`https://remotive.com/api/remote-jobs?category=software-dev&limit=${Math.min(100, Math.max(20, limit * 4))}`);
+  return (data.jobs || [])
+    .filter((job) => includesAny([job.title, job.description, job.company_name, job.candidate_required_location].join(" "), targetRoles))
+    .slice(0, limit)
+    .map((job) => normalizeJob({
+      provider: "Remotive",
+      companyName: job.company_name || "Unknown company",
+      companyWebsite: normalizeWebsite(job.company_logo ? "" : job.company_url || ""),
+      companyDomain: domainFromWebsite(job.company_url || ""),
+      jobTitle: job.title || "Open role",
+      jobUrl: job.url || "",
+      applyUrl: job.url || "",
+      publicContactEmail: publicEmailFromText(job.description),
+      location: job.candidate_required_location || "Remote",
+      department: job.category || "Software Development",
+      description: stripHtml(job.description || ""),
+      raw: job,
+    }, targetRoles));
+}
+
+async function sourceJobicy(_config, targetRoles, limit) {
+  const tags = ["python", "react", "full-stack", "javascript", "software-dev"];
+  const jobs = [];
+  for (const tag of tags) {
+    const data = await fetchJson(`https://jobicy.com/api/v2/remote-jobs?count=${Math.min(50, Math.max(10, limit))}&tag=${encodeURIComponent(tag)}`);
+    jobs.push(...(data.jobs || []));
+  }
+  return jobs
+    .filter((job) => includesAny([job.jobTitle, job.jobDescription, job.companyName, job.jobIndustry, job.jobGeo].join(" "), targetRoles))
+    .slice(0, limit)
+    .map((job) => normalizeJob({
+      provider: "Jobicy",
+      companyName: job.companyName || "Unknown company",
+      companyWebsite: normalizeWebsite(job.companyWebsite || ""),
+      companyDomain: domainFromWebsite(job.companyWebsite || ""),
+      jobTitle: job.jobTitle || "Open role",
+      jobUrl: job.url || "",
+      applyUrl: job.url || "",
+      publicContactEmail: publicEmailFromText(job.jobDescription),
+      location: job.jobGeo || "Remote",
+      department: Array.isArray(job.jobIndustry) ? job.jobIndustry.join(", ") : job.jobIndustry || "",
+      description: stripHtml(job.jobDescription || ""),
+      raw: job,
+    }, targetRoles));
+}
+
+async function sourceArbeitnow(_config, targetRoles, limit) {
+  const data = await fetchJson(`https://www.arbeitnow.com/api/job-board-api?per_page=${Math.min(100, Math.max(20, limit * 4))}`);
+  return (data.data || [])
+    .filter((job) => includesAny([job.title, job.description, job.company_name, (job.tags || []).join(" ")].join(" "), targetRoles))
+    .slice(0, limit)
+    .map((job) => normalizeJob({
+      provider: "Arbeitnow",
+      companyName: job.company_name || "Unknown company",
+      companyWebsite: "",
+      companyDomain: "",
+      jobTitle: job.title || "Open role",
+      jobUrl: job.url || "",
+      applyUrl: job.url || "",
+      publicContactEmail: publicEmailFromText(job.description),
+      location: job.location || (job.remote ? "Remote" : ""),
+      department: Array.isArray(job.tags) ? job.tags.join(", ") : "",
+      description: stripHtml(job.description || ""),
+      raw: job,
+    }, targetRoles));
+}
+
+function hnThreadMonthQuery() {
+  const now = new Date();
+  const month = now.toLocaleString("en-US", { month: "long", timeZone: "UTC" });
+  return `Ask HN: Who is hiring? (${month} ${now.getUTCFullYear()})`;
+}
+function hnCompanyFromComment(text) { return stripHtml(text).split("|")[0]?.trim().slice(0, 80) || "HN Company"; }
+function hnTitleFromComment(text, targetRoles) {
+  const cleaned = stripHtml(text);
+  const hiringMatch = /\bHiring:\s*([^.!?]{3,120})/i.exec(cleaned);
+  if (hiringMatch) return hiringMatch[1].replace(/^[-:\s]+/, "").trim();
+  const parts = cleaned.split("|").map((part) => part.trim()).filter(Boolean);
+  const rolePart = parts.find((part) => includesAny(part, targetRoles) && part.length <= 120);
+  if (rolePart) return rolePart;
+  return parts.find((part) => /engineer|developer|python|react|ai/i.test(part) && part.length <= 120) || parts[1]?.slice(0, 120) || "Open engineering role";
+}
+async function sourceHnWhoIsHiring(_config, targetRoles, limit) {
+  const search = await fetchJson(`https://hn.algolia.com/api/v1/search_by_date?query=${encodeURIComponent(hnThreadMonthQuery())}&tags=story&hitsPerPage=5`);
+  const thread = (search.hits || []).find((hit) => /who.?s hiring|who is hiring/i.test(hit.title || ""));
+  if (!thread?.objectID) return [];
+  const story = await fetchJson(`https://hacker-news.firebaseio.com/v0/item/${thread.objectID}.json`);
+  const comments = [];
+  for (const id of (story.kids || []).slice(0, Math.min(120, limit * 8))) {
+    try {
+      const comment = await fetchJson(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);
+      const text = stripHtml(comment.text || "");
+      if (includesAny(text, targetRoles)) comments.push({ id, text, raw: comment });
+      if (comments.length >= limit) break;
+    } catch { /* ignore deleted comments */ }
+  }
+  return comments.map((comment) => normalizeJob({
+    provider: "HN Who's Hiring",
+    companyName: hnCompanyFromComment(comment.text),
+    companyWebsite: firstUrlFromText(comment.text),
+    companyDomain: domainFromWebsite(firstUrlFromText(comment.text)),
+    jobTitle: hnTitleFromComment(comment.text, targetRoles),
+    jobUrl: `https://news.ycombinator.com/item?id=${comment.id}`,
+    applyUrl: firstUrlFromText(comment.text) || `https://news.ycombinator.com/item?id=${comment.id}`,
+    publicContactEmail: publicEmailFromText(comment.text),
+    location: /remote/i.test(comment.text) ? "Remote / HN listed" : "HN listed",
+    department: "HN Who's Hiring",
+    description: comment.text,
+    raw: comment.raw,
+  }, targetRoles));
 }
 
 async function sourceHiringSignals(config, limit) {
   const targetRoles = config.targetRoles;
   const companies = configuredCompanies(config);
-  const perProviderLimit = Math.max(1, Math.ceil(limit / Math.max(companies.length || 1, 1)));
+  const providerLimit = Math.max(3, Math.ceil(limit / 4));
   const results = [];
   const events = [];
+  const publicSources = [sourceHimalayas, sourceRemotive, sourceJobicy, sourceArbeitnow, sourceHnWhoIsHiring];
+  for (const source of publicSources) {
+    const providerName = source.name.replace(/^source/, "") || "Public API";
+    try {
+      const jobs = await source(config, targetRoles, providerLimit);
+      results.push(...jobs);
+      events.push([`activity_${crypto.randomUUID()}`, nowIso(), "Lead Source", providerName, "Free-first public jobs", jobs.length ? "Success" : "No matching roles", `Matched ${jobs.length} role(s)`]);
+    } catch (error) {
+      events.push([`activity_${crypto.randomUUID()}`, nowIso(), "Lead Source", providerName, "Free-first public jobs", "Error", error.message]);
+    }
+  }
+  const perCompanyLimit = Math.max(1, Math.ceil(limit / Math.max(companies.length || 1, 1)));
   for (const company of companies) {
     for (const source of [sourceGreenhouse, sourceLever]) {
       try {
-        const jobs = await source(company, targetRoles, perProviderLimit);
+        const jobs = await source(company, targetRoles, perCompanyLimit);
         results.push(...jobs);
         events.push([`activity_${crypto.randomUUID()}`, nowIso(), "Lead Source", jobs[0]?.provider || (source === sourceGreenhouse ? "Greenhouse" : "Lever"), company.name || company.domain || company.greenhouseBoardToken || company.leverSlug, jobs.length ? "Success" : "No matching roles", `Matched ${jobs.length} role(s)`]);
       } catch (error) {
@@ -141,7 +338,16 @@ async function sourceHiringSignals(config, limit) {
       }
     }
   }
-  return { jobs: results.slice(0, limit), events };
+  const deduped = [];
+  const seen = new Set();
+  for (const job of results.sort((a, b) => (b.opportunityScore || 0) - (a.opportunityScore || 0))) {
+    const key = sourceJobKey(job);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(job);
+    if (deduped.length >= limit) break;
+  }
+  return { jobs: deduped, events };
 }
 
 async function findymailJson(config, path, body) {
@@ -259,6 +465,22 @@ async function verifyWithDropcontact(config, contact) {
 
 async function enrichDecisionMakers(config, job) {
   const attempts = [];
+  if (job.publicContactEmail) {
+    attempts.push({ provider: "Public Contact", count: 1, ok: true });
+    return {
+      contacts: [{
+        provider: "Public Contact",
+        fullName: "Hiring Team",
+        firstName: "Hiring",
+        lastName: "Team",
+        email: job.publicContactEmail,
+        linkedinUrl: "",
+        title: "Hiring Team",
+        company: job.companyName,
+      }],
+      attempts,
+    };
+  }
   for (const provider of [enrichWithFindymail, enrichWithLeadMagic]) {
     try {
       const contacts = await provider(config, job);
@@ -286,12 +508,12 @@ function normalizeContact(contact, job) {
     companyIndustry: contact.industry || job.department || "",
     companySize: contact.company_size || "",
     location: contact.location || job.location || "",
-    hiringSignal: `${job.provider} public job API shows active hiring for ${job.jobTitle}. ${job.jobUrl}`,
+    hiringSignal: `${job.provider} shows active hiring for ${job.jobTitle}. ${job.applyUrl || job.jobUrl}`,
     currentHiringTitles: job.jobTitle,
-    keywords: [job.department, job.jobTitle].filter(Boolean).join(" "),
-    personalizationAngle: `${job.companyName} is hiring for ${job.jobTitle}.`,
+    keywords: [job.department, job.jobTitle, job.description].filter(Boolean).join(" "),
+    personalizationAngle: `${job.companyName} is hiring for ${job.jobTitle} via ${job.provider}.`,
     sourceProvider: `${job.provider} + ${contact.provider}`,
-    sourceUrl: job.jobUrl,
+    sourceUrl: job.applyUrl || job.jobUrl,
     enrichmentProvider: contact.provider,
   };
 }
@@ -352,7 +574,7 @@ for (const job of jobs) {
     const angle = buildPersonalizationAngle(person, signals);
     const id = stableId("lead", [person.email, person.linkedinUrl, person.fullName, person.company, person.currentHiringTitles]);
     const status = scored.score >= config.minimumScoreToDraft ? "Qualified" : scored.score >= 40 ? "New" : "Rejected";
-    const notes = [`source_url=${person.sourceUrl}`, `enrichment=${person.enrichmentProvider}`, `verification=${verification.provider}:${verification.state}:${verification.score}`].join("; ");
+    const notes = [`source_url=${person.sourceUrl}`, `apply_url=${job.applyUrl || job.jobUrl}`, `opportunity_score=${job.opportunityScore || ""}`, `public_contact=${job.publicContactEmail || ""}`, `enrichment=${person.enrichmentProvider}`, `verification=${verification.provider}:${verification.state}:${verification.score}`].filter(Boolean).join("; ");
     leadIdsForSignal.push(id);
     leads.push([
       id,
@@ -403,18 +625,18 @@ for (const job of jobs) {
       job.jobUrl,
       job.location,
       job.department,
-      `${job.provider} public job API shows active hiring for ${job.jobTitle}.`,
-      job.jobTitle,
-      contactableContacts.length ? "Contact-ready lead found" : "Needs enrichment/manual review",
+      `${job.provider} shows active hiring for ${job.jobTitle}. Apply: ${job.applyUrl || job.jobUrl}`,
+      `${job.jobTitle} · score ${job.opportunityScore || "n/a"}`,
+      contactableContacts.length ? "Contact-ready lead found" : "Application link captured; needs contact/enrichment",
       contactableContacts.length,
       leadIdsForSignal.join(", "),
-      contactableContacts.length ? "Copied contact-ready people to Leads" : "Stored as hiring signal only; not a contact-ready lead",
+      [`score=${job.opportunityScore || ""}`, `apply_url=${job.applyUrl || job.jobUrl}`, `public_contact=${job.publicContactEmail || ""}`, contactableContacts.length ? "Copied contact-ready contact to Leads" : "Stored as hiring signal/application opportunity"].filter(Boolean).join("; "),
     ]);
     metrics.hiringSignals += 1;
   }
 }
 
-const metricRow = [todayDate(), metrics.hiringSignals, metrics.contactableLeads, leads.filter((row) => row[18] === "Qualified").length, queue.length, 0, 0, 0, 0, 0, metrics.suppressed, "Greenhouse + Lever waterfall", `contacts=${metrics.enrichedContacts}; duplicates=${metrics.duplicates}; manual_review_opportunities=${metrics.manualReview}`];
+const metricRow = [todayDate(), metrics.hiringSignals, metrics.contactableLeads, leads.filter((row) => row[18] === "Qualified").length, queue.length, 0, 0, 0, 0, 0, metrics.suppressed, "Free-first public API waterfall", `sources=Himalayas,Remotive,Jobicy,Arbeitnow,HN,Greenhouse,Lever; contacts=${metrics.enrichedContacts}; duplicates=${metrics.duplicates}; manual_review_opportunities=${metrics.manualReview}`];
 
 if (commit) {
   await appendRows(config.spreadsheetId, "Hiring Signals", hiringSignals);

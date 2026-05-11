@@ -48,16 +48,16 @@ async function sheetHeaderStatus(spreadsheetId) {
 
 async function publicApiStatus(config) {
   const companies = config.targetCompanies || [];
-  if (!companies.length) return { ok: false, state: "missing_target_companies", providers: [] };
-  const providers = [];
+  const boardProviders = [];
   for (const company of companies) {
-    if (company.greenhouseBoardToken) providers.push("greenhouse");
-    if (company.leverSlug) providers.push("lever");
+    if (company.greenhouseBoardToken) boardProviders.push("greenhouse");
+    if (company.leverSlug) boardProviders.push("lever");
   }
   return {
-    ok: providers.length > 0,
-    state: providers.length ? "configured" : "missing_greenhouse_or_lever_slugs",
-    providers: Array.from(new Set(providers)),
+    ok: true,
+    state: "free_first_configured",
+    providers: ["himalayas", "remotive", "jobicy", "arbeitnow", "hn-who-is-hiring", ...Array.from(new Set(boardProviders))],
+    targetCompanyBoards: companies.length,
   };
 }
 

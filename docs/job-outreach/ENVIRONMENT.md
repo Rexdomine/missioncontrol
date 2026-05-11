@@ -21,15 +21,16 @@ JOB_OUTREACH_RESUME_DRIVE_FILE_ID=ADD_DRIVE_FILE_ID
 Required for production lead sourcing:
 
 ```bash
-# Public hiring sources do not need API keys, but they do need target companies/boards.
+# Free-first public hiring sources do not need API keys.
+# Target companies are optional fallback boards for Greenhouse/Lever after the free public API pass.
 JOB_OUTREACH_TARGET_COMPANIES_JSON='[
   {"name":"Example AI","domain":"example.ai","greenhouseBoardToken":"example-ai"},
   {"name":"Example SaaS","domain":"example.com","leverSlug":"example"}
 ]'
-JOB_OUTREACH_TARGET_ROLES="AI Native Fullstack Engineer,AI Engineer,Full Stack Engineer,Product Engineer,Founding Engineer"
+JOB_OUTREACH_TARGET_ROLES="AI Native Fullstack Engineer,AI Engineer,Python Engineer,React Engineer,Full Stack Engineer,Product Engineer,Founding Engineer"
 JOB_OUTREACH_DECISION_MAKER_TITLES="Founder,CTO,Head of Engineering,Engineering Manager,Talent Partner"
 
-# Primary enrichment waterfall. Provide at least one.
+# Paid enrichment fallback. Helpful, but the source pass can still collect application links without these.
 FINDYMAIL_API_KEY=...
 LEADMAGIC_API_KEY=...
 ```
@@ -57,8 +58,8 @@ JOB_OUTREACH_MIN_SCORE_TO_DRAFT=70
 Safety defaults:
 
 - `JOB_OUTREACH_MODE=approved_send` means only rows explicitly marked `Approved` + `Send on Approval` can send.
-- Greenhouse and Lever source companies actively hiring from public job APIs; they do not email anyone.
-- Findymail/LeadMagic enrich decision-makers and emails; Hunter/Dropcontact verify/enrich fallback data.
+- Himalayas, Remotive, Jobicy, Arbeitnow, HN Who’s Hiring, Greenhouse, and Lever source companies actively hiring from public job data; they do not email anyone.
+- Application links and public contact emails are captured before paid enrichment. Findymail/LeadMagic enrich decision-makers only when needed; Hunter/Dropcontact verify/enrich fallback data.
 - Gmail sending should only run from approval-queue rows and must check suppression first.
 - The queue processor refuses to run without `JOB_OUTREACH_RESUME_URL` and inserts that Google Drive CV link into every outreach email body.
 - Activity Log and Daily Metrics are updated on committed source runs.
