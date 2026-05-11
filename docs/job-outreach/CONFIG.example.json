@@ -71,8 +71,8 @@
     "logEveryActivity": true,
     "gmailDraftsOnly": true
   },
-  "resumeAttachment": {
-    "path": "ADD_LOCAL_CV_PDF_PATH",
-    "attachToEveryOutreachDraft": true
+  "resumeLink": {
+    "url": "ADD_GOOGLE_DRIVE_CV_SHARE_LINK",
+    "includeInEveryOutreachDraft": true
   }
 }

@@ -60,4 +60,4 @@ npm run job-outreach:create-drafts -- --max 5             # dry-run approved que
 npm run job-outreach:create-drafts -- --max 5 --commit    # creates Gmail drafts only
 ```
 
-The sourcing script refuses to run unless `JOB_OUTREACH_MODE=draft_only` and required live config is present. The Gmail script creates drafts only from `Approved` + `Draft Only` queue rows, checks suppression, attaches the configured CV PDF from `JOB_OUTREACH_RESUME_PATH`, and does not send email.
+The sourcing script refuses to run unless `JOB_OUTREACH_MODE=draft_only` and required live config is present. The Gmail script creates drafts only from `Approved` + `Draft Only` queue rows, checks suppression, inserts the configured Google Drive CV link from `JOB_OUTREACH_RESUME_URL`, and does not send email.

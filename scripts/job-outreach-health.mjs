@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 
-import fs from "node:fs";
-import path from "node:path";
 import { readOpenClawApiKey, redact, validateLiveConfig } from "../lib/job-outreach/runtime-config.mjs";
 
 const CTRL_BASE = "https://ctrl.maton.ai";
@@ -80,9 +78,10 @@ const sheet = config.spreadsheetId ? await sheetHeaderStatus(config.spreadsheetI
 const leadSources = await publicApiStatus(config);
 const primaryEnrichmentReady = Boolean(config.findymailApiKey || config.leadMagicApiKey);
 const sheetReady = Object.values(sheet).every((check) => check.ok);
-const resumeAttachment = {
-  ok: Boolean(config.resumePath && fs.existsSync(config.resumePath)),
-  filename: config.resumePath ? path.basename(config.resumePath) : "missing",
+const resumeLink = {
+  ok: Boolean(config.resumeUrl),
+  state: config.resumeUrl ? "configured" : "missing",
+  driveFileId: config.resumeDriveFileId ? redact(config.resumeDriveFileId) : "missing",
 };
 
 const report = {
@@ -96,7 +95,7 @@ const report = {
     sheetReady &&
     leadSources.ok &&
     primaryEnrichmentReady &&
-    resumeAttachment.ok,
+    resumeLink.ok,
   missing,
   mode: config.mode,
   senderEmail: config.senderEmail || "missing",
@@ -106,7 +105,7 @@ const report = {
   targetCompanies: config.targetCompanies.length,
   leadSources,
   enrichment: sourceKeys,
-  resumeAttachment,
+  resumeLink,
   google,
   sheet,
 };

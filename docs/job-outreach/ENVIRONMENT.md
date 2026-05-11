@@ -14,7 +14,8 @@ JOB_OUTREACH_SENDER_EMAIL=rextechng@gmail.com
 JOB_OUTREACH_SENDER_NAME=Princewill Ejiogu
 CALENDLY_LINK=https://calendly.com/...
 JOB_OUTREACH_MODE=draft_only
-JOB_OUTREACH_RESUME_PATH=/home/node/.openclaw/workspace/state/Princewill_Chinedu_Ejiogu_Professional_Resume.pdf
+JOB_OUTREACH_RESUME_URL=https://drive.google.com/file/d/.../view
+JOB_OUTREACH_RESUME_DRIVE_FILE_ID=ADD_DRIVE_FILE_ID
 ```
 
 Required for production lead sourcing:
@@ -59,5 +60,5 @@ Safety defaults:
 - Greenhouse and Lever source companies actively hiring from public job APIs; they do not email anyone.
 - Findymail/LeadMagic enrich decision-makers and emails; Hunter/Dropcontact verify/enrich fallback data.
 - Gmail sending/drafting should only run from approval-queue rows and must check suppression first.
-- Gmail draft creation refuses to run without `JOB_OUTREACH_RESUME_PATH` and attaches that CV PDF to every outreach draft.
+- Gmail draft creation refuses to run without `JOB_OUTREACH_RESUME_URL` and inserts that Google Drive CV link into every outreach draft body.
 - Activity Log and Daily Metrics are updated on committed source runs.

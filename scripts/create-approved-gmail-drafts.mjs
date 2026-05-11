@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 
-import fs from "node:fs";
-import path from "node:path";
 import { getJobOutreachConfig, readOpenClawApiKey, validateLiveConfig } from "../lib/job-outreach/runtime-config.mjs";
 
 const SHEETS_BASE = "https://gateway.maton.ai/google-sheets/v4";
@@ -23,50 +21,13 @@ function parseArgs(argv) {
 function quoteSheetName(name) { return `'${name.replaceAll("'", "''")}'`; }
 function encodeBase64Url(value) { return Buffer.from(value, "utf8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, ""); }
 function escapeHeader(value) { return String(value || "").replace(/\r?\n/g, " ").trim(); }
-function chunkBase64(value) { return value.match(/.{1,76}/g)?.join("\r\n") || ""; }
-function ensureCvMention(body) {
-  if (/attached\s+(my\s+)?CV|CV\s+attached|resume\s+attached/i.test(body)) return body;
-  return String(body || "").replace("\n\nBest,", "\n\nI’ve attached my CV for context.\n\nBest,");
+function ensureCvLink(body, resumeUrl) {
+  if (!resumeUrl) throw new Error("Missing JOB_OUTREACH_RESUME_URL; refusing to create outreach drafts without a CV link.");
+  if (/CV:\s*https?:\/\/|resume:\s*https?:\/\//i.test(body)) return body;
+  return String(body || "").replace("\n\nBest,", `\n\nCV: ${resumeUrl}\n\nBest,`);
 }
-function readAttachment(attachmentPath) {
-  if (!attachmentPath) throw new Error("Missing JOB_OUTREACH_RESUME_PATH; refusing to create outreach drafts without the CV attachment.");
-  if (!fs.existsSync(attachmentPath)) throw new Error(`Resume attachment does not exist at JOB_OUTREACH_RESUME_PATH: ${attachmentPath}`);
-  const content = fs.readFileSync(attachmentPath);
-  return {
-    filename: path.basename(attachmentPath),
-    contentType: "application/pdf",
-    contentBase64: chunkBase64(content.toString("base64")),
-  };
-}
-function buildMimeMessage({ to, from, subject, text, attachment }) {
-  const safeText = ensureCvMention(text);
-  if (!attachment) {
-    return [`To: ${escapeHeader(to)}`, `From: ${escapeHeader(from)}`, `Subject: ${escapeHeader(subject)}`, 'Content-Type: text/plain; charset="UTF-8"', "MIME-Version: 1.0", "", safeText, ""].join("\r\n");
-  }
-  const boundary = `job-outreach-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-  return [
-    `To: ${escapeHeader(to)}`,
-    `From: ${escapeHeader(from)}`,
-    `Subject: ${escapeHeader(subject)}`,
-    "MIME-Version: 1.0",
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    "",
-    `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: 7bit",
-    "",
-    safeText,
-    "",
-    `--${boundary}`,
-    `Content-Type: ${attachment.contentType}; name="${escapeHeader(attachment.filename)}"`,
-    "Content-Transfer-Encoding: base64",
-    `Content-Disposition: attachment; filename="${escapeHeader(attachment.filename)}"`,
-    "",
-    attachment.contentBase64,
-    "",
-    `--${boundary}--`,
-    "",
-  ].join("\r\n");
+function buildMimeMessage({ to, from, subject, text, resumeUrl }) {
+  return [`To: ${escapeHeader(to)}`, `From: ${escapeHeader(from)}`, `Subject: ${escapeHeader(subject)}`, 'Content-Type: text/plain; charset="UTF-8"', "MIME-Version: 1.0", "", ensureCvLink(text, resumeUrl), ""].join("\r\n");
 }
 
 async function requestJson(url, { method = "GET", body } = {}) {
@@ -90,8 +51,8 @@ async function readRows(spreadsheetId, range) {
   return data.values || [];
 }
 
-async function createDraft({ to, from, subject, body, attachment }) {
-  const raw = encodeBase64Url(buildMimeMessage({ to, from, subject, text: body, attachment }));
+async function createDraft({ to, from, subject, body, resumeUrl }) {
+  const raw = encodeBase64Url(buildMimeMessage({ to, from, subject, text: body, resumeUrl }));
   return requestJson(`${GMAIL_BASE}/users/me/drafts`, { method: "POST", body: { message: { raw } } });
 }
 
@@ -102,7 +63,7 @@ const { missing } = validateLiveConfig({ allowMissingSourcingKeys: true });
 if (missing.length) throw new Error(`Missing required live config: ${missing.join(", ")}`);
 const config = getJobOutreachConfig();
 if (config.mode !== "draft_only") throw new Error(`Refusing Gmail draft creation while mode is ${config.mode}; MVP must stay draft_only.`);
-const attachment = readAttachment(config.resumePath);
+if (!config.resumeUrl) throw new Error("Missing JOB_OUTREACH_RESUME_URL; upload the CV to Drive and configure the share link before creating outreach drafts.");
 
 const [leadRows, queueRows, suppressionRows] = await Promise.all([
   readRows(config.spreadsheetId, `${quoteSheetName("Leads")}!A2:T`),
@@ -121,9 +82,9 @@ for (const item of approved) {
   const lead = leadsById.get(item.leadId);
   if (!lead?.email) { results.push({ queueId: item.queueId, skipped: "missing_lead_email" }); continue; }
   if (suppressed.has(lead.email.toLowerCase())) { results.push({ queueId: item.queueId, skipped: "suppressed" }); continue; }
-  if (!commit) { results.push({ queueId: item.queueId, to: lead.email, dryRun: true, attachment: attachment.filename }); continue; }
-  const draft = await createDraft({ to: lead.email, from: `${config.senderName} <${config.senderEmail}>`, subject: item.subject, body: item.body, attachment });
-  results.push({ queueId: item.queueId, to: lead.email, draftId: draft.id || draft.message?.id || "created", attachment: attachment.filename });
+  if (!commit) { results.push({ queueId: item.queueId, to: lead.email, dryRun: true, cvLink: "present" }); continue; }
+  const draft = await createDraft({ to: lead.email, from: `${config.senderName} <${config.senderEmail}>`, subject: item.subject, body: item.body, resumeUrl: config.resumeUrl });
+  results.push({ queueId: item.queueId, to: lead.email, draftId: draft.id || draft.message?.id || "created", cvLink: "present" });
 }
 
-console.log(JSON.stringify({ commit, approvedFound: approved.length, attachment: attachment.filename, results }, null, 2));
+console.log(JSON.stringify({ commit, approvedFound: approved.length, cvLink: "present", results }, null, 2));

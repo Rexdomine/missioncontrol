@@ -385,7 +385,7 @@ for (const job of jobs) {
     metrics.contactableLeads += 1;
 
     if (scored.score >= config.minimumScoreToDraft && !["invalid", "undeliverable", "risky"].includes(String(verification.state).toLowerCase())) {
-      const draft = buildInitialDraft({ firstName: person.firstName, company: person.company, title: person.title, angle });
+      const draft = buildInitialDraft({ firstName: person.firstName, company: person.company, title: person.title, angle, resumeUrl: config.resumeUrl });
       queue.push([`queue_${crypto.randomUUID()}`, id, scored.priority, "Initial", draft.subject, draft.body, "Pending", "Draft Only", "", "Not Sent", ""]);
       metrics.queuedDrafts += 1;
     }
