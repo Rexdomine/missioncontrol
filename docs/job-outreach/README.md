@@ -4,16 +4,17 @@ Sheet-approved outreach pipeline inside OpenClaw Mission Control.
 
 ## Architecture
 
-The pipeline uses a lead-source waterfall instead of Apollo:
+The pipeline uses a free-first lead-source waterfall instead of Apollo:
 
-1. **Hiring signal source** — Greenhouse public job boards first, then Lever public job postings.
-2. **Role filter** — keep companies actively hiring for Rex's target roles: AI-native full-stack, AI engineer, full-stack, product engineer, founding engineer, frontend/backend, and solutions engineer roles.
-3. **Opportunity tracking** — store company/job matches in `Hiring Signals`; these are not treated as contact-ready leads.
-4. **Decision-maker enrichment** — use Findymail or LeadMagic to find founders, CTOs, engineering/product leaders, technical recruiters, talent partners, names, and emails.
-5. **Lead creation** — write to `Leads` only when a person has a full name and email address.
-6. **Fallback verification/enrichment** — use Hunter or Dropcontact when the primary enrichment result needs email verification or secondary enrichment.
-7. **Execution** — Gmail sends only after Rex marks a queue row `Approved`; `Needs Rewrite` regenerates a reviewed draft; Calendly remains the booking path.
-8. **Mission Control** — dashboard metrics surface hiring signals, contactable leads, qualified leads, drafts, replies, opt-outs, interviews, and connector readiness.
+1. **Free public hiring sources** — Himalayas, Remotive, Jobicy, Arbeitnow, HN Who’s Hiring, Greenhouse public boards, and Lever public postings.
+2. **Role filter** — keep companies actively hiring for Rex's target roles: AI-native full-stack, AI engineer, Python, React, full-stack, product engineer, founding engineer, frontend/backend, and solutions engineer roles.
+3. **Opportunity scoring** — score each opportunity from role match, AI/Python/React/full-stack/product signals, remote fit, application link, and public contact availability.
+4. **Opportunity tracking** — store company/job matches, scores, application links, and public contact emails in `Hiring Signals`; these are not treated as person leads unless a contact email is available.
+5. **Free contact path first** — use application links and public contact emails before paid enrichment.
+6. **Decision-maker enrichment** — use Findymail or LeadMagic only when a free contact path is missing and the opportunity score justifies enrichment.
+7. **Fallback verification/enrichment** — use Hunter or Dropcontact when the primary enrichment result needs email verification or secondary enrichment.
+8. **Execution** — Gmail sends only after Rex marks a queue row `Approved`; `Needs Rewrite` regenerates a reviewed draft; Calendly remains the booking path.
+9. **Mission Control** — dashboard metrics surface hiring signals, contactable leads, qualified leads, drafts, replies, opt-outs, interviews, and connector readiness.
 
 ## Guardrails
 
@@ -22,7 +23,7 @@ The pipeline uses a lead-source waterfall instead of Apollo:
 - Every source run, enrichment attempt, lead score, send, rewrite, suppression block, reply, follow-up, and interview must be logged.
 - Suppression list is checked before any queue/draft work.
 - Opt-outs, bounces, and negative replies stop follow-ups.
-- Greenhouse and Lever are public hiring-signal sources; enrichment providers must respect API access, pricing limits, rate limits, and terms.
+- Public job APIs are the default sourcing layer; enrichment providers are fallback only and must respect API access, pricing limits, rate limits, and terms.
 - Google Sheets is the source-of-truth tracking layer through the connected Maton Google Workspace path.
 
 ## MVP Surfaces
@@ -42,7 +43,7 @@ The pipeline uses a lead-source waterfall instead of Apollo:
 - `lib/job-outreach/schema.ts` — sheet tabs, headers, settings, and safe config defaults.
 - `lib/job-outreach/scoring.ts` — deterministic 0–100 lead scoring helper.
 - `components/job-outreach-mission-control.tsx` — Mission Control dashboard module.
-- `scripts/source-job-outreach-waterfall.mjs` — Greenhouse/Lever sourcing + enrichment waterfall.
+- `scripts/source-job-outreach-waterfall.mjs` — free-first public job API sourcing + enrichment waterfall.
 - `scripts/separate-contactable-leads.mjs` — one-time/safety migration to move non-contact rows out of `Leads`.
 - `docs/job-outreach/CONFIG.example.json` — deploy/runtime config template.
 

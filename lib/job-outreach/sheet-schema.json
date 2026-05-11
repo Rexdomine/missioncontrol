@@ -234,11 +234,11 @@
     ],
     [
       "Lead Source Waterfall",
-      "Greenhouse public API -> Lever public API"
+      "Himalayas -> Remotive -> Jobicy -> Arbeitnow -> HN Who's Hiring -> Greenhouse -> Lever"
     ],
     [
       "Primary Enrichment",
-      "Findymail or LeadMagic"
+      "Public contact email first, then Findymail or LeadMagic"
     ],
     [
       "Fallback Verification",
@@ -246,7 +246,7 @@
     ],
     [
       "Target Roles",
-      "AI Native Fullstack Engineer, AI Engineer, Full Stack Engineer, Product Engineer, Founding Engineer"
+      "AI Native Fullstack Engineer, AI Engineer, Python Engineer, React Engineer, Full Stack Engineer, Product Engineer, Founding Engineer"
     ],
     [
       "Target Companies JSON",

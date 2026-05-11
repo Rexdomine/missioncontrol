@@ -19,12 +19,19 @@
   },
   "leadSourceWaterfall": {
     "providers": [
+      "Himalayas",
+      "Remotive",
+      "Jobicy",
+      "Arbeitnow",
+      "HN Who's Hiring",
       "Greenhouse public job API",
       "Lever public job API"
     ],
     "targetRoles": [
       "AI Native Fullstack Engineer",
       "AI Engineer",
+      "Python Engineer",
+      "React Engineer",
       "Full Stack Engineer",
       "Product Engineer",
       "Founding Engineer"
@@ -44,6 +51,7 @@
   },
   "enrichmentWaterfall": {
     "primary": [
+      "Public application link/contact email",
       "Findymail",
       "LeadMagic"
     ],
@@ -69,7 +77,7 @@
     "stopFollowUpsAfterReply": true,
     "stopFollowUpsAfterOptOut": true,
     "logEveryActivity": true,
-    "gmailDraftsOnly": true
+    "approvedRowsSendAutomatically": true
   },
   "resumeLink": {
     "url": "ADD_GOOGLE_DRIVE_CV_SHARE_LINK",

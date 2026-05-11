@@ -188,28 +188,34 @@ const interviews = [
 
 const sourceWaterfall = [
   {
-    provider: "Greenhouse public jobs API",
-    role: "Primary hiring signal",
+    provider: "Himalayas / Remotive / Jobicy / Arbeitnow",
+    role: "Free remote job APIs",
     status: "Configured",
-    notes: "Find companies actively hiring for Rex’s target roles from public board tokens.",
+    notes: "Find remote AI, Python, React, full-stack, and product engineering opportunities before paid enrichment is used.",
   },
   {
-    provider: "Lever public postings API",
-    role: "Secondary hiring signal",
+    provider: "HN Who’s Hiring",
+    role: "Founder/operator posts",
     status: "Configured",
-    notes: "Fallback company-role discovery when Greenhouse is not available.",
+    notes: "Parse the current monthly thread for high-intent engineering roles and public contact emails.",
   },
   {
-    provider: "Findymail / LeadMagic",
-    role: "Decision-maker enrichment",
+    provider: "Greenhouse / Lever public postings",
+    role: "Company board fallback",
     status: "Configured",
-    notes: "Find founders, CTOs, engineering/product leaders, recruiters, names, and emails before a row becomes a Lead.",
+    notes: "Keep direct company job boards in the waterfall for selected target companies.",
+  },
+  {
+    provider: "Public emails → Findymail / LeadMagic",
+    role: "Contact path",
+    status: "Configured",
+    notes: "Use application links and public emails first; enrich decision-makers only when a free contact path is missing.",
   },
   {
     provider: "Hunter / Dropcontact",
     role: "Verification fallback",
     status: "Configured",
-    notes: "Verify email data before qualified contact-ready leads enter the draft queue.",
+    notes: "Verify email data before qualified contact-ready leads enter the approval queue.",
   },
 ];
 
@@ -274,9 +280,9 @@ export function JobOutreachMissionControl() {
 
       <article className="panel-card">
         <SectionHeader
-          detail="Greenhouse and Lever identify active hiring signals first; enrichment providers only run after the company-role fit is clear."
-          eyebrow="Lead-source waterfall"
-          title="Public hiring APIs before enrichment"
+          detail="Free public job APIs identify active roles first; paid enrichment only runs when a free application link or public email is not enough."
+          eyebrow="Free-first sourcing waterfall"
+          title="Public job APIs before paid enrichment"
         />
         <div className="outreach-table">
           {sourceWaterfall.map((step) => (
