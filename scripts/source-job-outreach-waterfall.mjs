@@ -289,7 +289,7 @@ function normalizeContact(contact, job) {
     hiringSignal: `${job.provider} public job API shows active hiring for ${job.jobTitle}. ${job.jobUrl}`,
     currentHiringTitles: job.jobTitle,
     keywords: [job.department, job.jobTitle].filter(Boolean).join(" "),
-    personalizationAngle: `${job.companyName} is actively hiring for ${job.jobTitle} via ${job.provider}.`,
+    personalizationAngle: `${job.companyName} is hiring for ${job.jobTitle}.`,
     sourceProvider: `${job.provider} + ${contact.provider}`,
     sourceUrl: job.jobUrl,
     enrichmentProvider: contact.provider,
