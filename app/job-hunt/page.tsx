@@ -7,7 +7,7 @@ export default function JobHuntPage() {
     <MissionControlLayout
       hero={
         <PageHero
-          copy="Draft-only outbound job-search engine for Apollo-sourced hiring leads, AI scoring, personalized email approvals, Google Sheets tracking, reply handling, follow-ups, and Calendly interview conversion."
+          copy="Draft-only interview pipeline using Greenhouse and Lever public job APIs for active hiring signals, Findymail or LeadMagic for decision-makers, Hunter/Dropcontact verification fallback, Google Sheets tracking, Gmail drafts, and Calendly booking."
           eyebrow="Job Outreach Mission Control"
           metrics={[
             { label: "Mode", value: "Draft Only" },

@@ -54,7 +54,7 @@ async function createDraft({ to, from, subject, body }) {
 const args = parseArgs(process.argv.slice(2));
 const commit = Boolean(args.commit);
 const max = Number(args.max || 5);
-const { missing } = validateLiveConfig({ allowMissingApollo: true });
+const { missing } = validateLiveConfig({ allowMissingSourcingKeys: true });
 if (missing.length) throw new Error(`Missing required live config: ${missing.join(", ")}`);
 const config = getJobOutreachConfig();
 if (config.mode !== "draft_only") throw new Error(`Refusing Gmail draft creation while mode is ${config.mode}; MVP must stay draft_only.`);

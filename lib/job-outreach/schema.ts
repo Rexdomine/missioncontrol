@@ -24,7 +24,14 @@ export const jobOutreachTabs = [
       "Lead Score",
       "Lead Status",
       "Notes",
+      "Verification Provider",
+      "Verification Status",
+      "Source Details",
     ],
+  },
+  {
+    name: "Activity Log",
+    columns: ["Activity ID", "Timestamp", "Activity Type", "Provider", "Entity", "Status", "Notes"],
   },
   {
     name: "Outreach Queue",
@@ -144,6 +151,11 @@ export const jobOutreachSettings = [
   ["Calendly Link", "ADD_CALENDLY_LINK"],
   ["Sender Name", "Princewill Ejiogu"],
   ["Sender Email", "ADD_APPROVED_SENDER_EMAIL"],
+  ["Lead Source Waterfall", "Greenhouse public API -> Lever public API"],
+  ["Primary Enrichment", "Findymail or LeadMagic"],
+  ["Fallback Verification", "Hunter or Dropcontact"],
+  ["Target Roles", "AI Native Fullstack Engineer, AI Engineer, Full Stack Engineer, Product Engineer, Founding Engineer"],
+  ["Target Companies JSON", "ADD_GREENHOUSE_AND_LEVER_COMPANY_SLUGS"],
 ] as const;
 
 export const jobOutreachConfig = {
@@ -165,10 +177,15 @@ export const jobOutreachConfig = {
   calendly: {
     link: "ADD_CALENDLY_LINK",
   },
-  apollo: {
-    enabled: true,
-    searchLimitPerRun: 50,
-    termsAndRateLimitsRequired: true,
+  leadSourceWaterfall: {
+    providers: ["Greenhouse public job API", "Lever public job API"],
+    targetRoles: ["AI Native Fullstack Engineer", "AI Engineer", "Full Stack Engineer", "Product Engineer", "Founding Engineer"],
+    requiresCompanySlugs: true,
+  },
+  enrichmentWaterfall: {
+    primary: ["Findymail", "LeadMagic"],
+    fallbackVerification: ["Hunter", "Dropcontact"],
+    decisionMakerTitles: ["Founder", "CTO", "Head of Engineering", "Engineering Manager", "Talent Partner"],
   },
   googleSheets: {
     spreadsheetName: JOB_OUTREACH_SPREADSHEET_NAME,

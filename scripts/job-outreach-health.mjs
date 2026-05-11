@@ -32,59 +32,42 @@ async function connectionStatus(app) {
 }
 
 async function sheetHeaderStatus(spreadsheetId) {
-  try {
-    const data = await requestJson(`${SHEETS_BASE}/spreadsheets/${spreadsheetId}/values/${encodeURIComponent("'Leads'!A1:T1")}`);
-    const columns = data.values?.[0] || [];
-    return { ok: columns[0] === "Lead ID" && columns.at(-1) === "Notes", columns: columns.length };
-  } catch (error) {
-    return { ok: false, columns: 0, detail: error instanceof Error ? error.message : String(error) };
+  const ranges = ["'Leads'!A1:W1", "'Activity Log'!A1:G1", "'Daily Metrics'!A1:L1"];
+  const checks = {};
+  for (const range of ranges) {
+    try {
+      const data = await requestJson(`${SHEETS_BASE}/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`);
+      const columns = data.values?.[0] || [];
+      checks[range] = { ok: columns.length > 0, columns: columns.length };
+    } catch (error) {
+      checks[range] = { ok: false, columns: 0, detail: error instanceof Error ? error.message : String(error) };
+    }
   }
+  return checks;
 }
 
-async function apolloStatus(config) {
-  if (!config.apolloApiKey) return { ok: false, state: "missing_key" };
-
-  try {
-  const healthResponse = await fetch(`${config.apolloApiBase.replace(/\/$/, "")}/auth/health`, {
-    headers: { "x-api-key": config.apolloApiKey, "Cache-Control": "no-cache" },
-  });
-  if (!healthResponse.ok) {
-    return { ok: false, state: `${healthResponse.status} ${healthResponse.statusText}` };
+async function publicApiStatus(config) {
+  const companies = config.targetCompanies || [];
+  if (!companies.length) return { ok: false, state: "missing_target_companies", providers: [] };
+  const providers = [];
+  for (const company of companies.slice(0, 3)) {
+    if (company.greenhouseBoardToken) providers.push("greenhouse");
+    if (company.leverSlug) providers.push("lever");
   }
-
-  const searchResponse = await fetch(`${config.apolloApiBase.replace(/\/$/, "")}/mixed_people/search`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": "no-cache",
-      "x-api-key": config.apolloApiKey,
-    },
-    body: JSON.stringify({
-      page: 1,
-      per_page: 1,
-      person_titles: ["Founder", "CTO", "Head of Engineering", "Technical Recruiter"],
-      organization_num_employees_ranges: ["1,10", "11,20", "21,50", "51,100", "101,200"],
-    }),
-  });
-  const text = await searchResponse.text();
-  let data;
-  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
-  if (!searchResponse.ok) {
-    return {
-      ok: false,
-      state: data.error_code || `${searchResponse.status} ${searchResponse.statusText}`,
-      detail: data.error ? String(data.error).replace(config.apolloApiKey, "[redacted]") : "Apollo search access check failed",
-    };
-  }
-
-  return { ok: true, state: "search_access_ok" };
-  } catch (error) {
-    return { ok: false, state: "connect_error", detail: error instanceof Error ? error.message : String(error) };
-  }
+  return {
+    ok: providers.length > 0,
+    state: providers.length ? "configured" : "missing_greenhouse_or_lever_slugs",
+    providers: Array.from(new Set(providers)),
+  };
 }
 
-const { config, missing } = validateLiveConfig();
-const apollo = await apolloStatus(config);
+const { config, missing } = validateLiveConfig({ allowMissingSourcingKeys: true });
+const sourceKeys = {
+  findymail: config.findymailApiKey ? "present" : "missing",
+  leadMagic: config.leadMagicApiKey ? "present" : "missing",
+  hunter: config.hunterApiKey ? "present" : "missing",
+  dropcontact: config.dropcontactApiKey ? "present" : "missing",
+};
 const google = {
   sheets: await connectionStatus("google-sheets"),
   gmail: await connectionStatus("google-mail"),
@@ -92,21 +75,36 @@ const google = {
   drive: await connectionStatus("google-drive"),
 };
 const sheet = config.spreadsheetId ? await sheetHeaderStatus(config.spreadsheetId) : { ok: false, columns: 0 };
+const leadSources = await publicApiStatus(config);
+const primaryEnrichmentReady = Boolean(config.findymailApiKey || config.leadMagicApiKey);
+const sheetReady = Object.values(sheet).every((check) => check.ok);
+
 const report = {
-  ready: missing.length === 0 && apollo.ok && google.sheets.ok && google.gmail.ok && google.calendar.ok && google.drive.ok && sheet.ok,
+  ready:
+    missing.length === 0 &&
+    config.mode === "draft_only" &&
+    google.sheets.ok &&
+    google.gmail.ok &&
+    google.calendar.ok &&
+    google.drive.ok &&
+    sheetReady &&
+    leadSources.ok &&
+    primaryEnrichmentReady,
   missing,
   mode: config.mode,
   senderEmail: config.senderEmail || "missing",
   spreadsheetId: redact(config.spreadsheetId),
   calendlyLink: config.calendlyLink ? "present" : "missing",
-  apolloApiKey: config.apolloApiKey ? "present" : "missing",
+  targetRoles: config.targetRoles,
+  targetCompanies: config.targetCompanies.length,
+  leadSources,
+  enrichment: sourceKeys,
   google,
   sheet,
-  apollo,
 };
 
 console.log(JSON.stringify(report, null, 2));
 
-if (!report.google.sheets.ok || !report.sheet.ok || !report.apollo.ok || missing.length > 0) {
+if (!report.ready) {
   process.exitCode = 1;
 }
