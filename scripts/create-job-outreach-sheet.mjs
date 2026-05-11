@@ -40,6 +40,39 @@ function quoteSheetName(name) {
   return `'${name.replaceAll("'", "''")}'`;
 }
 
+function validationRequest({ sheetId, startColumnIndex, endColumnIndex, values }) {
+  return {
+    setDataValidation: {
+      range: { sheetId, startRowIndex: 1, endRowIndex: 1000, startColumnIndex, endColumnIndex },
+      rule: {
+        condition: { type: "ONE_OF_LIST", values: values.map((userEnteredValue) => ({ userEnteredValue })) },
+        inputMessage: `Choose one of: ${values.join(", ")}`,
+        strict: true,
+        showCustomUi: true,
+      },
+    },
+  };
+}
+
+async function applyDataValidation(spreadsheetId) {
+  const spreadsheet = await requestJson(`${GATEWAY_BASE}/spreadsheets/${spreadsheetId}?fields=sheets.properties(sheetId,title)`);
+  const sheetsByTitle = new Map((spreadsheet.sheets || []).map((sheet) => [sheet.properties?.title, sheet.properties]));
+  const outreachQueue = sheetsByTitle.get("Outreach Queue");
+  const followUps = sheetsByTitle.get("Follow Ups");
+  const requests = [];
+  if (outreachQueue?.sheetId !== undefined) {
+    requests.push(
+      validationRequest({ sheetId: outreachQueue.sheetId, startColumnIndex: 6, endColumnIndex: 7, values: ["Pending", "Approved", "Rejected"] }),
+      validationRequest({ sheetId: outreachQueue.sheetId, startColumnIndex: 7, endColumnIndex: 8, values: ["Draft Only"] }),
+    );
+  }
+  if (followUps?.sheetId !== undefined) {
+    requests.push(validationRequest({ sheetId: followUps.sheetId, startColumnIndex: 7, endColumnIndex: 8, values: ["Pending", "Approved", "Rejected"] }));
+  }
+  if (!requests.length) return;
+  await requestJson(`${GATEWAY_BASE}/spreadsheets/${spreadsheetId}:batchUpdate`, { method: "POST", body: { requests } });
+}
+
 const spreadsheet = await requestJson(`${GATEWAY_BASE}/spreadsheets`, {
   method: "POST",
   body: {
@@ -62,5 +95,7 @@ await requestJson(
   `${GATEWAY_BASE}/spreadsheets/${spreadsheetId}/values/${encodeURIComponent("'Settings'!A2")}?valueInputOption=RAW`,
   { method: "PUT", body: { values: jobOutreachSettings.map((row) => Array.from(row)) } },
 );
+
+await applyDataValidation(spreadsheetId);
 
 console.log(JSON.stringify({ spreadsheetId, spreadsheetUrl: spreadsheet.spreadsheetUrl, title: JOB_OUTREACH_SPREADSHEET_NAME }, null, 2));

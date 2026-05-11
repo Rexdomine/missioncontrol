@@ -27,6 +27,52 @@ async function requestJson(url, { method = "GET", body } = {}) {
   return data;
 }
 
+function validationRequest({ sheetId, startColumnIndex, endColumnIndex, values }) {
+  return {
+    setDataValidation: {
+      range: {
+        sheetId,
+        startRowIndex: 1,
+        endRowIndex: 1000,
+        startColumnIndex,
+        endColumnIndex,
+      },
+      rule: {
+        condition: {
+          type: "ONE_OF_LIST",
+          values: values.map((userEnteredValue) => ({ userEnteredValue })),
+        },
+        inputMessage: `Choose one of: ${values.join(", ")}`,
+        strict: true,
+        showCustomUi: true,
+      },
+    },
+  };
+}
+
+async function applyDataValidation(spreadsheetId) {
+  const spreadsheet = await requestJson(`${SHEETS_BASE}/spreadsheets/${spreadsheetId}?fields=sheets.properties(sheetId,title)`);
+  const sheetsByTitle = new Map((spreadsheet.sheets || []).map((sheet) => [sheet.properties?.title, sheet.properties]));
+  const outreachQueue = sheetsByTitle.get("Outreach Queue");
+  const followUps = sheetsByTitle.get("Follow Ups");
+  const requests = [];
+
+  if (outreachQueue?.sheetId !== undefined) {
+    requests.push(
+      validationRequest({ sheetId: outreachQueue.sheetId, startColumnIndex: 6, endColumnIndex: 7, values: ["Pending", "Approved", "Rejected"] }),
+      validationRequest({ sheetId: outreachQueue.sheetId, startColumnIndex: 7, endColumnIndex: 8, values: ["Draft Only"] }),
+    );
+  }
+  if (followUps?.sheetId !== undefined) {
+    requests.push(
+      validationRequest({ sheetId: followUps.sheetId, startColumnIndex: 7, endColumnIndex: 8, values: ["Pending", "Approved", "Rejected"] }),
+    );
+  }
+  if (!requests.length) return { validations: 0 };
+  await requestJson(`${SHEETS_BASE}/spreadsheets/${spreadsheetId}:batchUpdate`, { method: "POST", body: { requests } });
+  return { validations: requests.length };
+}
+
 async function ensureSheetSchema(spreadsheetId) {
   const spreadsheet = await requestJson(`${SHEETS_BASE}/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`);
   const existing = new Set((spreadsheet.sheets || []).map((sheet) => sheet.properties?.title).filter(Boolean));
@@ -43,7 +89,8 @@ async function ensureSheetSchema(spreadsheetId) {
       body: { values: [Array.from(tab.columns)] },
     });
   }
-  return { addedTabs: missingTabs.map((tab) => tab.name), headerTabs: jobOutreachTabs.length };
+  const validation = await applyDataValidation(spreadsheetId);
+  return { addedTabs: missingTabs.map((tab) => tab.name), headerTabs: jobOutreachTabs.length, ...validation };
 }
 
 const { missing } = validateLiveConfig({ allowMissingSourcingKeys: true });
