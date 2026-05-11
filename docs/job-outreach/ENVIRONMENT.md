@@ -6,14 +6,14 @@ Secrets and live connector values should stay outside git. The scripts load this
 /home/node/.openclaw/workspace/state/job-outreach-live.env
 ```
 
-Required values for the safe tracking/draft-only pipeline:
+Required values for the approved-send pipeline:
 
 ```bash
 JOB_OUTREACH_SPREADSHEET_ID=19QDgwHRwSyNxMgTBy7_78eq6Ff2jkEmik01HmoSc5D0
 JOB_OUTREACH_SENDER_EMAIL=rextechng@gmail.com
 JOB_OUTREACH_SENDER_NAME=Princewill Ejiogu
 CALENDLY_LINK=https://calendly.com/...
-JOB_OUTREACH_MODE=draft_only
+JOB_OUTREACH_MODE=approved_send
 JOB_OUTREACH_RESUME_URL=https://drive.google.com/file/d/.../view
 JOB_OUTREACH_RESUME_DRIVE_FILE_ID=ADD_DRIVE_FILE_ID
 ```
@@ -56,9 +56,9 @@ JOB_OUTREACH_MIN_SCORE_TO_DRAFT=70
 
 Safety defaults:
 
-- `JOB_OUTREACH_MODE` must remain `draft_only` for MVP.
+- `JOB_OUTREACH_MODE=approved_send` means only rows explicitly marked `Approved` + `Send on Approval` can send.
 - Greenhouse and Lever source companies actively hiring from public job APIs; they do not email anyone.
 - Findymail/LeadMagic enrich decision-makers and emails; Hunter/Dropcontact verify/enrich fallback data.
-- Gmail sending/drafting should only run from approval-queue rows and must check suppression first.
-- Gmail draft creation refuses to run without `JOB_OUTREACH_RESUME_URL` and inserts that Google Drive CV link into every outreach draft body.
+- Gmail sending should only run from approval-queue rows and must check suppression first.
+- The queue processor refuses to run without `JOB_OUTREACH_RESUME_URL` and inserts that Google Drive CV link into every outreach email body.
 - Activity Log and Daily Metrics are updated on committed source runs.

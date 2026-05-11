@@ -1,6 +1,6 @@
 # Interview Pipeline Mission Control
 
-Draft-only MVP for a targeted interview outreach pipeline inside OpenClaw Mission Control.
+Sheet-approved outreach pipeline inside OpenClaw Mission Control.
 
 ## Architecture
 
@@ -12,12 +12,12 @@ The pipeline uses a lead-source waterfall instead of Apollo:
 4. **Decision-maker enrichment** — use Findymail or LeadMagic to find founders, CTOs, engineering/product leaders, technical recruiters, talent partners, names, and emails.
 5. **Lead creation** — write to `Leads` only when a person has a full name and email address.
 6. **Fallback verification/enrichment** — use Hunter or Dropcontact when the primary enrichment result needs email verification or secondary enrichment.
-7. **Execution** — Gmail stays Draft Only; Calendly is used only inside reviewed reply/interview booking drafts.
+7. **Execution** — Gmail sends only after Rex marks a queue row `Approved`; `Needs Rewrite` regenerates a reviewed draft; Calendly remains the booking path.
 8. **Mission Control** — dashboard metrics surface hiring signals, contactable leads, qualified leads, drafts, replies, opt-outs, interviews, and connector readiness.
 
 ## Guardrails
 
-- Default mode is `Draft Only`; auto-send is disabled.
+- Default mode is `approved_send`: only rows explicitly marked `Approved` are sent automatically.
 - `Hiring Signals` means company/job opportunity; `Leads` means contact-ready person with full name and email.
 - Every source run, enrichment attempt, lead score, draft, reply, follow-up, and interview must be logged.
 - Suppression list is checked before any queue/draft work.
@@ -56,8 +56,8 @@ npm run job-outreach:sync-settings
 npm run job-outreach:separate-leads                    # move old non-contact lead rows to Hiring Signals
 npm run job-outreach:source-leads -- --limit 20          # dry-run
 npm run job-outreach:source-leads -- --limit 20 --commit # writes Hiring Signals + contact-ready Leads + Outreach Queue + Activity Log + Daily Metrics
-npm run job-outreach:create-drafts -- --max 5             # dry-run approved queue rows
-npm run job-outreach:create-drafts -- --max 5 --commit    # creates Gmail drafts only
+npm run job-outreach:process-queue -- --max 5             # dry-run approved/rewrite queue rows
+npm run job-outreach:process-queue -- --max 5 --commit    # sends Approved rows; rewrites Needs Rewrite rows
 ```
 
-The sourcing script refuses to run unless `JOB_OUTREACH_MODE=draft_only` and required live config is present. The Gmail script creates drafts only from `Approved` + `Draft Only` queue rows, checks suppression, inserts the configured Google Drive CV link from `JOB_OUTREACH_RESUME_URL`, and does not send email.
+The sourcing script runs only in `draft_only` or `approved_send` mode. The queue processor sends only rows with `Approval Status = Approved` and `Send Mode = Send on Approval`, checks suppression, inserts the configured Google Drive CV link from `JOB_OUTREACH_RESUME_URL`, marks successful rows as `Sent`, and leaves `Rejected` rows untouched. `Needs Rewrite` regenerates the email body and resets the row to `Pending`.

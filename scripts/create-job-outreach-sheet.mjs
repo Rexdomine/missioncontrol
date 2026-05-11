@@ -62,12 +62,12 @@ async function applyDataValidation(spreadsheetId) {
   const requests = [];
   if (outreachQueue?.sheetId !== undefined) {
     requests.push(
-      validationRequest({ sheetId: outreachQueue.sheetId, startColumnIndex: 6, endColumnIndex: 7, values: ["Pending", "Approved", "Rejected"] }),
-      validationRequest({ sheetId: outreachQueue.sheetId, startColumnIndex: 7, endColumnIndex: 8, values: ["Draft Only"] }),
+      validationRequest({ sheetId: outreachQueue.sheetId, startColumnIndex: 6, endColumnIndex: 7, values: ["Pending", "Approved", "Rejected", "Needs Rewrite"] }),
+      validationRequest({ sheetId: outreachQueue.sheetId, startColumnIndex: 7, endColumnIndex: 8, values: ["Send on Approval"] }),
     );
   }
   if (followUps?.sheetId !== undefined) {
-    requests.push(validationRequest({ sheetId: followUps.sheetId, startColumnIndex: 7, endColumnIndex: 8, values: ["Pending", "Approved", "Rejected"] }));
+    requests.push(validationRequest({ sheetId: followUps.sheetId, startColumnIndex: 7, endColumnIndex: 8, values: ["Pending", "Approved", "Rejected", "Needs Rewrite"] }));
   }
   if (!requests.length) return;
   await requestJson(`${GATEWAY_BASE}/spreadsheets/${spreadsheetId}:batchUpdate`, { method: "POST", body: { requests } });

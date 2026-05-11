@@ -303,7 +303,7 @@ const commit = Boolean(args.commit);
 const limit = Number(args.limit || getJobOutreachConfig().dailyLeadLimit || 50);
 const { config, missing } = validateLiveConfig({ allowMissingSourcingKeys: true });
 if (missing.length) throw new Error(`Missing required live config: ${missing.join(", ")}`);
-if (config.mode !== "draft_only") throw new Error(`Refusing sourcing while mode is ${config.mode}; MVP must stay draft_only.`);
+if (!["draft_only", "approved_send"].includes(config.mode)) throw new Error(`Refusing sourcing while mode is ${config.mode}; expected draft_only or approved_send.`);
 
 const [leadRows, signalRows, suppressionRows] = await Promise.all([
   readSheetRows(config.spreadsheetId, `${quoteSheetName("Leads")}!A2:Z`),
@@ -386,7 +386,7 @@ for (const job of jobs) {
 
     if (scored.score >= config.minimumScoreToDraft && !["invalid", "undeliverable", "risky"].includes(String(verification.state).toLowerCase())) {
       const draft = buildInitialDraft({ firstName: person.firstName, company: person.company, title: person.title, angle, resumeUrl: config.resumeUrl });
-      queue.push([`queue_${crypto.randomUUID()}`, id, scored.priority, "Initial", draft.subject, draft.body, "Pending", "Draft Only", "", "Not Sent", ""]);
+      queue.push([`queue_${crypto.randomUUID()}`, id, scored.priority, "Initial", draft.subject, draft.body, "Pending", "Send on Approval", "", "Not Sent", ""]);
       metrics.queuedDrafts += 1;
     }
   }

@@ -1,6 +1,6 @@
 {
   "projectName": "Interview Pipeline Mission Control",
-  "mode": "draft_only",
+  "mode": "approved_send",
   "dailyLeadLimit": 50,
   "dailySendLimit": 25,
   "minimumScoreToDraft": 70,
