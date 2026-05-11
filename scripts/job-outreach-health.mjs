@@ -78,6 +78,11 @@ const sheet = config.spreadsheetId ? await sheetHeaderStatus(config.spreadsheetI
 const leadSources = await publicApiStatus(config);
 const primaryEnrichmentReady = Boolean(config.findymailApiKey || config.leadMagicApiKey);
 const sheetReady = Object.values(sheet).every((check) => check.ok);
+const resumeLink = {
+  ok: Boolean(config.resumeUrl),
+  state: config.resumeUrl ? "configured" : "missing",
+  driveFileId: config.resumeDriveFileId ? redact(config.resumeDriveFileId) : "missing",
+};
 
 const report = {
   ready:
@@ -89,7 +94,8 @@ const report = {
     google.drive.ok &&
     sheetReady &&
     leadSources.ok &&
-    primaryEnrichmentReady,
+    primaryEnrichmentReady &&
+    resumeLink.ok,
   missing,
   mode: config.mode,
   senderEmail: config.senderEmail || "missing",
@@ -99,6 +105,7 @@ const report = {
   targetCompanies: config.targetCompanies.length,
   leadSources,
   enrichment: sourceKeys,
+  resumeLink,
   google,
   sheet,
 };
