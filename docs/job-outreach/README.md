@@ -58,8 +58,12 @@ npm run job-outreach:sync-settings
 npm run job-outreach:separate-leads                    # move old non-contact lead rows to Hiring Signals
 npm run job-outreach:source-leads -- --limit 20          # dry-run
 npm run job-outreach:source-leads -- --limit 20 --commit # writes Hiring Signals + contact-ready Leads + Outreach Queue + Activity Log + Daily Metrics
-npm run job-outreach:process-queue -- --max 5             # dry-run approved/rewrite queue rows
-npm run job-outreach:process-queue -- --max 5 --commit    # sends Approved rows; rewrites Needs Rewrite rows
+npm run job-outreach:process-queue -- --max 25            # dry-run approved/rewrite queue rows
+npm run job-outreach:process-queue -- --max 25 --commit   # sends Approved rows; rewrites Needs Rewrite rows
+npm run job-outreach:sync-replies                         # dry-run Gmail replies -> Replies/Follow Ups/Interviews/Suppression
+npm run job-outreach:sync-replies -- --commit             # commits reply monitoring updates
 ```
 
 The sourcing script runs only in `draft_only` or `approved_send` mode. The queue processor sends only rows with `Approval Status = Approved` and `Send Mode = Send on Approval`, checks suppression, inserts the configured Google Drive CV link from `JOB_OUTREACH_RESUME_URL`, marks successful rows as `Sent`, writes `Email Activity` with Gmail message ID and follow-up due date, creates the first `Follow Ups` row, increments Daily Metrics emails sent, and leaves `Rejected` rows untouched. `Needs Rewrite` regenerates the email body and resets the row to `Pending`.
+
+The reply monitor scans Gmail threads for sent outreach, writes new inbound replies to `Replies`, classifies opt-outs/not-interested/positive/referral/out-of-office/unclear replies, pauses or stops pending follow-ups, appends opt-outs to `Suppression List`, moves positive scheduling replies into `Interviews`, writes `Activity Log`, and updates `Daily Metrics` reply/positive/interview/opt-out counts.
