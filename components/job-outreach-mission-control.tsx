@@ -200,14 +200,14 @@ const sourceWaterfall = [
   {
     provider: "Findymail / LeadMagic",
     role: "Decision-maker enrichment",
-    status: "Needs API key",
-    notes: "Find founders, CTOs, engineering/product leaders, recruiters, and emails.",
+    status: "Configured",
+    notes: "Find founders, CTOs, engineering/product leaders, recruiters, names, and emails before a row becomes a Lead.",
   },
   {
     provider: "Hunter / Dropcontact",
     role: "Verification fallback",
-    status: "Needs API key",
-    notes: "Verify or enrich email data before qualified leads enter draft queue.",
+    status: "Configured",
+    notes: "Verify email data before qualified contact-ready leads enter the draft queue.",
   },
 ];
 
@@ -224,7 +224,8 @@ export function JobOutreachMissionControl() {
 
   const metrics = useMemo(
     () => [
-      { label: "Leads sourced today", value: "5" },
+      { label: "Hiring signals today", value: "5" },
+      { label: "Contact-ready leads", value: String(leads.length) },
       { label: "Qualified leads today", value: "4" },
       { label: "Emails drafted today", value: String(approvalDrafts.length) },
       { label: "Emails sent today", value: "0" },
@@ -310,9 +311,9 @@ export function JobOutreachMissionControl() {
         <div className="primary-column">
           <article className="panel-card board-panel">
             <SectionHeader
-              detail="Leads are grouped by operational state so sourcing, qualification, drafting, replies, and interviews stay connected."
+              detail="Only people with a full name and email belong here; company/job matches without contacts stay in Hiring Signals."
               eyebrow="Lead pipeline"
-              title="Leads by status"
+              title="Contact-ready leads by status"
             />
             <div className="outreach-table">
               {leads.map((lead) => (
@@ -470,7 +471,8 @@ export function JobOutreachMissionControl() {
             title="Today’s Outreach Summary"
           />
           <div className="daily-report-card">
-            <p>Leads sourced: 5</p>
+            <p>Hiring signals found: 5</p>
+            <p>Contact-ready leads: {leads.length}</p>
             <p>Qualified leads: 4</p>
             <p>Emails drafted: {approvalDrafts.length}</p>
             <p>Emails sent: 0</p>
@@ -479,7 +481,7 @@ export function JobOutreachMissionControl() {
             <p>Interviews booked: 0</p>
             <p>Follow-ups due tomorrow: 1</p>
             <p>Best lead segment: AI workflow / SaaS founders</p>
-            <p>Recommended improvement: add target company board slugs plus Findymail or LeadMagic, then Hunter/Dropcontact for verification fallback.</p>
+            <p>Recommended improvement: keep Leads contact-ready only; route company/job matches without emails to Hiring Signals for enrichment review.</p>
           </div>
         </article>
       </section>

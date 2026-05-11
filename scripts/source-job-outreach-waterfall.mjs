@@ -190,16 +190,54 @@ async function enrichWithFindymail(config, job) {
   return contacts;
 }
 
-async function enrichWithLeadMagic(config, job) {
-  if (!config.leadMagicApiKey) return [];
-  const response = await fetch(`${config.leadMagicApiBase.replace(/\/$/, "")}/contacts/search`, {
+async function leadMagicJson(config, path, body) {
+  const response = await fetch(`${config.leadMagicApiBase.replace(/\/$/, "")}${path}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${config.leadMagicApiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ domain: job.companyDomain, company_name: job.companyName, titles: config.decisionMakerTitles }),
+    headers: { "X-API-Key": config.leadMagicApiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`LeadMagic enrichment failed: ${response.status} ${response.statusText}: ${await response.text()}`);
-  const data = await response.json();
-  return (data.contacts || data.results || []).map((contact) => ({ provider: "LeadMagic", ...contact }));
+  const text = await response.text();
+  let data;
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (!response.ok) throw new Error(`LeadMagic ${path} failed: ${response.status} ${response.statusText}: ${text}`);
+  return data;
+}
+
+async function enrichWithLeadMagic(config, job) {
+  if (!config.leadMagicApiKey || !job.companyDomain) return [];
+  for (const title of config.decisionMakerTitles.slice(0, 8)) {
+    const person = await leadMagicJson(config, "/v1/people/role-finder", {
+      job_title: title,
+      company_domain: job.companyDomain,
+      company_name: job.companyName,
+    });
+    const fullName = person.full_name || person.name || [person.first_name, person.last_name].filter(Boolean).join(" ");
+    if (!fullName || /no matching role/i.test(person.message || "")) continue;
+    let email = person.email || "";
+    if (!email) {
+      const found = await leadMagicJson(config, "/v1/people/email-finder", {
+        full_name: fullName,
+        first_name: person.first_name,
+        last_name: person.last_name,
+        domain: job.companyDomain,
+        company_name: job.companyName,
+      });
+      email = found.email || "";
+    }
+    return [{
+      provider: "LeadMagic",
+      fullName,
+      firstName: person.first_name || "",
+      lastName: person.last_name || "",
+      email,
+      linkedinUrl: person.profile_url || "",
+      title: person.job_title || title,
+      company: person.company_name || job.companyName,
+      company_size: person.company_size || "",
+      industry: person.company_industry || "",
+    }];
+  }
+  return [];
 }
 
 async function verifyWithHunter(config, email) {
@@ -267,34 +305,39 @@ const { config, missing } = validateLiveConfig({ allowMissingSourcingKeys: true 
 if (missing.length) throw new Error(`Missing required live config: ${missing.join(", ")}`);
 if (config.mode !== "draft_only") throw new Error(`Refusing sourcing while mode is ${config.mode}; MVP must stay draft_only.`);
 
-const [leadRows, suppressionRows] = await Promise.all([
+const [leadRows, signalRows, suppressionRows] = await Promise.all([
   readSheetRows(config.spreadsheetId, `${quoteSheetName("Leads")}!A2:Z`),
+  readSheetRows(config.spreadsheetId, `${quoteSheetName("Hiring Signals")}!A2:P`),
   readSheetRows(config.spreadsheetId, `${quoteSheetName("Suppression List")}!A2:E`),
 ]);
 const knownEmails = new Set(leadRows.map((row) => rowKey(row, 6)).filter(Boolean));
 const knownLinkedIns = new Set(leadRows.map((row) => rowKey(row, 7)).filter(Boolean));
-const knownLeadKeys = new Set(leadRows.map((row) => [rowKey(row, 9), rowKey(row, 8)].join("|")).filter((key) => key !== "|"));
+const knownSignalKeys = new Set(signalRows.map((row) => [rowKey(row, 3), rowKey(row, 6), rowKey(row, 7)].join("|")).filter((key) => key !== "||"));
 const suppressedEmails = new Set(suppressionRows.map((row) => rowKey(row, 0)).filter(Boolean));
 
 const { jobs, events } = await sourceHiringSignals(config, limit);
+const hiringSignals = [];
 const leads = [];
 const queue = [];
 const activity = [...events];
-const metrics = { jobsChecked: jobs.length, enrichedContacts: 0, suppressed: 0, duplicates: 0, queuedDrafts: 0, manualReview: 0 };
+const metrics = { jobsChecked: jobs.length, hiringSignals: 0, contactableLeads: 0, enrichedContacts: 0, suppressed: 0, duplicates: 0, queuedDrafts: 0, manualReview: 0 };
 
 for (const job of jobs) {
   const { contacts, attempts } = await enrichDecisionMakers(config, job);
   for (const attempt of attempts) activity.push([`activity_${crypto.randomUUID()}`, nowIso(), "Enrichment", attempt.provider, job.companyName, attempt.ok ? "Success" : "Error", attempt.ok ? `Returned ${attempt.count} contact(s)` : attempt.error]);
-  metrics.enrichedContacts += contacts.filter((contact) => contact.email).length;
-  if (!contacts.some((contact) => contact.email)) metrics.manualReview += 1;
+  const contactableContacts = contacts.filter((contact) => Boolean(contact.email) && Boolean(contact.name || contact.fullName || contact.full_name));
+  metrics.enrichedContacts += contactableContacts.length;
+  if (!contactableContacts.length) metrics.manualReview += 1;
+  const signalId = stableId("signal", [job.provider, job.companyName, job.jobTitle, job.jobUrl]);
+  const signalKey = [String(job.companyName || "").toLowerCase(), String(job.jobTitle || "").toLowerCase(), String(job.jobUrl || "").toLowerCase()].join("|");
+  const leadIdsForSignal = [];
 
-  for (const contact of contacts) {
+  for (const contact of contactableContacts) {
     const person = normalizeContact(contact, job);
     const emailKey = person.email.toLowerCase();
     const linkedInKey = person.linkedinUrl.toLowerCase();
-    const leadKey = [person.company.toLowerCase(), person.title.toLowerCase()].join("|");
     if ((emailKey && suppressedEmails.has(emailKey))) { metrics.suppressed += 1; continue; }
-    if ((emailKey && knownEmails.has(emailKey)) || (linkedInKey && knownLinkedIns.has(linkedInKey)) || knownLeadKeys.has(leadKey)) { metrics.duplicates += 1; continue; }
+    if ((emailKey && knownEmails.has(emailKey)) || (linkedInKey && knownLinkedIns.has(linkedInKey))) { metrics.duplicates += 1; continue; }
 
     let verification = { provider: "None", state: person.email ? "unverified" : "manual_required", score: "" };
     try {
@@ -308,8 +351,9 @@ for (const job of jobs) {
     const scored = scoreLead(signals);
     const angle = buildPersonalizationAngle(person, signals);
     const id = stableId("lead", [person.email, person.linkedinUrl, person.fullName, person.company, person.currentHiringTitles]);
-    const status = !person.email ? "New" : scored.score >= config.minimumScoreToDraft ? "Qualified" : scored.score >= 40 ? "New" : "Rejected";
+    const status = scored.score >= config.minimumScoreToDraft ? "Qualified" : scored.score >= 40 ? "New" : "Rejected";
     const notes = [`source_url=${person.sourceUrl}`, `enrichment=${person.enrichmentProvider}`, `verification=${verification.provider}:${verification.state}:${verification.score}`].join("; ");
+    leadIdsForSignal.push(id);
     leads.push([
       id,
       nowIso(),
@@ -338,21 +382,46 @@ for (const job of jobs) {
 
     activity.push([`activity_${crypto.randomUUID()}`, nowIso(), "Lead Scored", person.sourceProvider, person.company, status, `score=${scored.score}; ${notes}`]);
 
-    if (person.email && scored.score >= config.minimumScoreToDraft && !["invalid", "undeliverable", "risky"].includes(String(verification.state).toLowerCase())) {
+    metrics.contactableLeads += 1;
+
+    if (scored.score >= config.minimumScoreToDraft && !["invalid", "undeliverable", "risky"].includes(String(verification.state).toLowerCase())) {
       const draft = buildInitialDraft({ firstName: person.firstName, company: person.company, title: person.title, angle });
       queue.push([`queue_${crypto.randomUUID()}`, id, scored.priority, "Initial", draft.subject, draft.body, "Pending", "Draft Only", "", "Not Sent", ""]);
       metrics.queuedDrafts += 1;
     }
   }
+
+  if (!knownSignalKeys.has(signalKey)) {
+    hiringSignals.push([
+      signalId,
+      nowIso(),
+      job.provider,
+      job.companyName,
+      job.companyWebsite,
+      job.companyDomain,
+      job.jobTitle,
+      job.jobUrl,
+      job.location,
+      job.department,
+      `${job.provider} public job API shows active hiring for ${job.jobTitle}.`,
+      job.jobTitle,
+      contactableContacts.length ? "Contact-ready lead found" : "Needs enrichment/manual review",
+      contactableContacts.length,
+      leadIdsForSignal.join(", "),
+      contactableContacts.length ? "Copied contact-ready people to Leads" : "Stored as hiring signal only; not a contact-ready lead",
+    ]);
+    metrics.hiringSignals += 1;
+  }
 }
 
-const metricRow = [todayDate(), jobs.length, leads.filter((row) => row[18] === "Qualified").length, queue.length, 0, 0, 0, 0, 0, metrics.suppressed, "Greenhouse + Lever waterfall", `contacts=${metrics.enrichedContacts}; duplicates=${metrics.duplicates}; manual_review=${metrics.manualReview}`];
+const metricRow = [todayDate(), metrics.hiringSignals, metrics.contactableLeads, leads.filter((row) => row[18] === "Qualified").length, queue.length, 0, 0, 0, 0, 0, metrics.suppressed, "Greenhouse + Lever waterfall", `contacts=${metrics.enrichedContacts}; duplicates=${metrics.duplicates}; manual_review_opportunities=${metrics.manualReview}`];
 
 if (commit) {
+  await appendRows(config.spreadsheetId, "Hiring Signals", hiringSignals);
   await appendRows(config.spreadsheetId, "Leads", leads);
   await appendRows(config.spreadsheetId, "Outreach Queue", queue);
   await appendRows(config.spreadsheetId, "Activity Log", activity);
   await appendRows(config.spreadsheetId, "Daily Metrics", [metricRow]);
 }
 
-console.log(JSON.stringify({ commit, jobsChecked: jobs.length, insertedLeads: leads.length, queuedDrafts: queue.length, activityEvents: activity.length, metrics }, null, 2));
+console.log(JSON.stringify({ commit, jobsChecked: jobs.length, insertedHiringSignals: hiringSignals.length, insertedContactableLeads: leads.length, queuedDrafts: queue.length, activityEvents: activity.length, metrics }, null, 2));
