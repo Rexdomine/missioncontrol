@@ -36,9 +36,10 @@ interface FollowUpItem {
   contact: string;
   company: string;
   previousEmailDate: string;
+  dueDate: string;
   followUpNumber: number;
   message: string;
-  approvalStatus: "Pending" | "Approved" | "Auto";
+  approvalStatus: "Pending" | "Approved" | "Needs Rewrite";
 }
 
 interface ReplyItem {
@@ -142,6 +143,7 @@ const followUps: FollowUpItem[] = [
     contact: "Amara Okafor",
     company: "Atlas Product Studio",
     previousEmailDate: "May 9, 2026",
+    dueDate: "May 12, 2026",
     followUpNumber: 1,
     message:
       "Just wanted to follow up on this. I think my background in full-stack engineering, AI tooling, and founder-led product building could be useful if Atlas needs extra technical execution support.",
@@ -243,14 +245,14 @@ export function JobOutreachMissionControl() {
       <article className="panel-card outreach-safety-panel">
         <SectionHeader
           detail="MVP is intentionally conservative: Greenhouse/Lever sourcing and Gmail execution must pass logging, scoring, suppression, enrichment, and approval gates first."
-          eyebrow="Draft-only MVP"
+          eyebrow="Approved-send MVP"
           title="Interview Pipeline Mission Control"
         />
         <div className="outreach-guardrail-grid">
           <div className="detail-card">
             <p className="eyebrow">Mode</p>
             <strong>{jobOutreachConfig.mode.replace("_", " ")}</strong>
-            <p className="detail-copy">Auto-send disabled. Approved items create drafts/logs first.</p>
+            <p className="detail-copy">Sheet-approved rows send automatically; Pending, Rejected, and Needs Rewrite rows do not send.</p>
           </div>
           <div className="detail-card">
             <p className="eyebrow">Minimum score</p>
@@ -333,9 +335,9 @@ export function JobOutreachMissionControl() {
 
           <article className="panel-card">
             <SectionHeader
-              detail="Pending emails must be reviewed before Gmail drafts or any future send action is allowed."
+              detail="Pending emails must be reviewed in Google Sheets before Gmail sends. Approved + Send on Approval sends; Needs Rewrite regenerates and returns to Pending."
               eyebrow="Approval queue"
-              title="Drafts waiting for Rex"
+              title="Rows waiting for Rex"
             />
             <div className="approval-draft-grid">
               <div className="approval-draft-list">
@@ -365,8 +367,8 @@ export function JobOutreachMissionControl() {
                   <h3>{selectedDraft.subject}</h3>
                   <pre>{selectedDraft.body}</pre>
                   <div className="approval-actions outreach-actions" aria-label="Draft approval actions">
-                    <button type="button">Approve draft</button>
-                    <button className="secondary" type="button">Edit</button>
+                    <button type="button">Approve & send</button>
+                    <button className="secondary" type="button">Needs rewrite</button>
                     <button className="secondary" type="button">Reject</button>
                     <button className="secondary" type="button">Suppress</button>
                   </div>
@@ -379,7 +381,7 @@ export function JobOutreachMissionControl() {
         <div className="secondary-column">
           <article className="panel-card rail-panel">
             <SectionHeader
-              detail="Follow-ups remain draft-only and cancel automatically after replies, opt-outs, or bounces."
+              detail="Sent initial outreach creates a due date and pending follow-up record; replies, opt-outs, or bounces should stop the next follow-up."
               eyebrow="Follow-ups"
               title="Due today"
             />
@@ -391,6 +393,7 @@ export function JobOutreachMissionControl() {
                     <span>F{followUp.followUpNumber}</span>
                   </div>
                   <p>{followUp.company} · Previous: {followUp.previousEmailDate}</p>
+                  <p><strong>Due:</strong> {followUp.dueDate}</p>
                   <p>{followUp.message}</p>
                   <span className={`status-pill ${statusTone(followUp.approvalStatus)}`}>{followUp.approvalStatus}</span>
                 </div>
@@ -466,7 +469,7 @@ export function JobOutreachMissionControl() {
 
         <article className="panel-card accent-card">
           <SectionHeader
-            detail="Generated from sheet-backed counts once live connectors are wired."
+            detail="Generated from sheet-backed counts as live connectors run."
             eyebrow="Daily report"
             title="Today’s Outreach Summary"
           />
@@ -475,7 +478,7 @@ export function JobOutreachMissionControl() {
             <p>Contact-ready leads: {leads.length}</p>
             <p>Qualified leads: 4</p>
             <p>Emails drafted: {approvalDrafts.length}</p>
-            <p>Emails sent: 0</p>
+            <p>Emails sent: sheet-tracked after approval</p>
             <p>Replies: {replies.length}</p>
             <p>Positive replies: 1</p>
             <p>Interviews booked: 0</p>
