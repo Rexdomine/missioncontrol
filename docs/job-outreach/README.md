@@ -19,7 +19,7 @@ The pipeline uses a lead-source waterfall instead of Apollo:
 
 - Default mode is `approved_send`: only rows explicitly marked `Approved` are sent automatically.
 - `Hiring Signals` means company/job opportunity; `Leads` means contact-ready person with full name and email.
-- Every source run, enrichment attempt, lead score, draft, reply, follow-up, and interview must be logged.
+- Every source run, enrichment attempt, lead score, send, rewrite, suppression block, reply, follow-up, and interview must be logged.
 - Suppression list is checked before any queue/draft work.
 - Opt-outs, bounces, and negative replies stop follow-ups.
 - Greenhouse and Lever are public hiring-signal sources; enrichment providers must respect API access, pricing limits, rate limits, and terms.
@@ -52,6 +52,7 @@ All live commands load `/home/node/.openclaw/workspace/state/job-outreach-live.e
 
 ```bash
 npm run job-outreach:health
+npm run job-outreach:audit                         # checks live sheet/process invariants without sending
 npm run job-outreach:sync-settings
 npm run job-outreach:separate-leads                    # move old non-contact lead rows to Hiring Signals
 npm run job-outreach:source-leads -- --limit 20          # dry-run
@@ -60,4 +61,4 @@ npm run job-outreach:process-queue -- --max 5             # dry-run approved/rew
 npm run job-outreach:process-queue -- --max 5 --commit    # sends Approved rows; rewrites Needs Rewrite rows
 ```
 
-The sourcing script runs only in `draft_only` or `approved_send` mode. The queue processor sends only rows with `Approval Status = Approved` and `Send Mode = Send on Approval`, checks suppression, inserts the configured Google Drive CV link from `JOB_OUTREACH_RESUME_URL`, marks successful rows as `Sent`, and leaves `Rejected` rows untouched. `Needs Rewrite` regenerates the email body and resets the row to `Pending`.
+The sourcing script runs only in `draft_only` or `approved_send` mode. The queue processor sends only rows with `Approval Status = Approved` and `Send Mode = Send on Approval`, checks suppression, inserts the configured Google Drive CV link from `JOB_OUTREACH_RESUME_URL`, marks successful rows as `Sent`, writes `Email Activity` with Gmail message ID and follow-up due date, creates the first `Follow Ups` row, increments Daily Metrics emails sent, and leaves `Rejected` rows untouched. `Needs Rewrite` regenerates the email body and resets the row to `Pending`.

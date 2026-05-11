@@ -16,6 +16,7 @@
     "typegen": "next typegen",
     "typecheck": "next typegen && tsc --noEmit",
     "job-outreach:health": "node scripts/job-outreach-health.mjs",
+    "job-outreach:audit": "node scripts/job-outreach-audit.mjs",
     "job-outreach:sync-settings": "node scripts/sync-job-outreach-settings.mjs",
     "job-outreach:source-leads": "node scripts/source-job-outreach-waterfall.mjs",
     "job-outreach:separate-leads": "node scripts/separate-contactable-leads.mjs",
