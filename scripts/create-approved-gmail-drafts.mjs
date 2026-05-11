@@ -23,6 +23,11 @@ function parseArgs(argv) {
 
 function quoteSheetName(name) { return `'${name.replaceAll("'", "''")}'`; }
 function nowIso() { return new Date().toISOString(); }
+function addDaysIso(isoDate, days) {
+  const date = new Date(isoDate);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
 function encodeBase64Url(value) { return Buffer.from(value, "utf8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, ""); }
 function escapeHeader(value) { return String(value || "").replace(/\r?\n/g, " ").trim(); }
 function rowValue(row, index) { return String(row[index] || "").trim(); }
@@ -92,6 +97,7 @@ const max = Number(args.max || 5);
 const { missing } = validateLiveConfig({ allowMissingSourcingKeys: true });
 if (missing.length) throw new Error(`Missing required live config: ${missing.join(", ")}`);
 const config = getJobOutreachConfig();
+const firstFollowUpDays = Number(process.env.JOB_OUTREACH_FIRST_FOLLOW_UP_DAYS || 3);
 if (config.mode !== "approved_send") throw new Error(`Refusing automatic send while JOB_OUTREACH_MODE is ${config.mode}; set approved_send only when approved rows should send.`);
 if (!config.resumeUrl) throw new Error("Missing JOB_OUTREACH_RESUME_URL; upload the CV to Drive and configure the share link before processing outreach.");
 
@@ -160,7 +166,8 @@ for (const [index, row] of queueRows.entries()) {
   sentRow[9] = "Sent";
   sentRow[10] = "";
   queueUpdates.push({ rowNumber, row: sentRow });
-  emailActivity.push([`email_${crypto.randomUUID()}`, lead.id, lead.email, item.emailType, item.subject, sentAt, messageId, "Sent", "", `queue_id=${item.queueId}; cv_link=present`]);
+  const followUpDueDate = addDaysIso(sentAt, firstFollowUpDays);
+  emailActivity.push([`email_${crypto.randomUUID()}`, lead.id, lead.email, item.emailType, item.subject, sentAt, messageId, "Sent", followUpDueDate, `queue_id=${item.queueId}; cv_link=present; first_follow_up_days=${firstFollowUpDays}`]);
   results.push({ queueId: item.queueId, to: lead.email, messageId, action: "sent", cvLink: "present" });
   processed += 1;
 }
