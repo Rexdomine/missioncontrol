@@ -129,7 +129,7 @@ async function incrementDailyMetric(spreadsheetId, metricDate, columnIndex, amou
 
 const args = parseArgs(process.argv.slice(2));
 const commit = Boolean(args.commit);
-const max = Number(args.max || 5);
+const max = Number(args.max || 25);
 const { missing } = validateLiveConfig({ allowMissingSourcingKeys: true });
 if (missing.length) throw new Error(`Missing required live config: ${missing.join(", ")}`);
 const config = getJobOutreachConfig();
@@ -164,7 +164,17 @@ function queueUpdate(rowNumber, row, patch) {
   queueUpdates.push({ rowNumber, row: next });
 }
 
-for (const [index, row] of queueRows.entries()) {
+const prioritizedQueueRows = queueRows
+  .map((row, index) => ({ row, index }))
+  .sort((a, b) => {
+    const aApproval = rowValue(a.row, 6);
+    const bApproval = rowValue(b.row, 6);
+    if (aApproval === "Needs Rewrite" && bApproval !== "Needs Rewrite") return -1;
+    if (bApproval === "Needs Rewrite" && aApproval !== "Needs Rewrite") return 1;
+    return a.index - b.index;
+  });
+
+for (const { row, index } of prioritizedQueueRows) {
   if (processed >= max) break;
   const rowNumber = index + 2;
   const item = {
@@ -199,7 +209,7 @@ for (const [index, row] of queueRows.entries()) {
       processed += 1;
       continue;
     }
-    const draft = buildInitialDraft({ firstName: lead.firstName, company: lead.company, title: lead.title, angle: lead.personalizationAngle || lead.hiringSignal, resumeUrl: config.resumeUrl });
+    const draft = buildInitialDraft({ firstName: lead.firstName, fullName: lead.fullName, email: lead.email, company: lead.company, title: lead.title, angle: lead.personalizationAngle || lead.hiringSignal, resumeUrl: config.resumeUrl });
     const rewrittenRow = ensureLength(row, 11);
     rewrittenRow[4] = draft.subject;
     rewrittenRow[5] = draft.body;
