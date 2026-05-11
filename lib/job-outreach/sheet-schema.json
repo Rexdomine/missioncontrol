@@ -23,7 +23,10 @@
         "Personalization Angle",
         "Lead Score",
         "Lead Status",
-        "Notes"
+        "Notes",
+        "Verification Provider",
+        "Verification Status",
+        "Source Details"
       ]
     },
     {
@@ -40,6 +43,18 @@
         "Scheduled Send Date",
         "Sent Status",
         "Error Message"
+      ]
+    },
+    {
+      "name": "Activity Log",
+      "columns": [
+        "Activity ID",
+        "Timestamp",
+        "Activity Type",
+        "Provider",
+        "Entity",
+        "Status",
+        "Notes"
       ]
     },
     {
@@ -194,6 +209,26 @@
     [
       "Sender Email",
       "ADD_APPROVED_SENDER_EMAIL"
+    ],
+    [
+      "Lead Source Waterfall",
+      "Greenhouse public API -> Lever public API"
+    ],
+    [
+      "Primary Enrichment",
+      "Findymail or LeadMagic"
+    ],
+    [
+      "Fallback Verification",
+      "Hunter or Dropcontact"
+    ],
+    [
+      "Target Roles",
+      "AI Native Fullstack Engineer, AI Engineer, Full Stack Engineer, Product Engineer, Founding Engineer"
+    ],
+    [
+      "Target Companies JSON",
+      "ADD_GREENHOUSE_AND_LEVER_COMPANY_SLUGS"
     ]
   ]
 }

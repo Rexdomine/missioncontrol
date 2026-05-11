@@ -2,18 +2,31 @@
 
 Draft-only MVP for a targeted interview outreach pipeline inside OpenClaw Mission Control.
 
+## Architecture
+
+The pipeline now uses a lead-source waterfall instead of Apollo:
+
+1. **Hiring signal source** — Greenhouse public job boards first, then Lever public job postings.
+2. **Role filter** — keep companies actively hiring for Rex's target roles: AI-native full-stack, AI engineer, full-stack, product engineer, founding engineer, frontend/backend, and solutions engineer roles.
+3. **Decision-maker enrichment** — use Findymail or LeadMagic to find founders, CTOs, engineering/product leaders, technical recruiters, and talent partners.
+4. **Fallback verification/enrichment** — use Hunter or Dropcontact when the primary enrichment result needs email verification or secondary enrichment.
+5. **Tracking and safety** — write leads, queue items, metrics, and activity events to Google Sheets; respect suppression/opt-outs before any draft work.
+6. **Execution** — Gmail stays Draft Only; Calendly is used only inside reviewed reply/interview booking drafts.
+7. **Mission Control** — dashboard metrics surface source volume, qualified leads, drafts, replies, opt-outs, interviews, and connector readiness.
+
 ## Guardrails
 
 - Default mode is `Draft Only`; auto-send is disabled.
-- Every lead, draft, reply, follow-up, and interview must be logged before action.
-- Suppression list is checked before any draft/send work.
+- Every lead-source run, enrichment attempt, lead score, draft, reply, follow-up, and interview must be logged.
+- Suppression list is checked before any queue/draft work.
 - Opt-outs, bounces, and negative replies stop follow-ups.
-- Apollo access must respect API access, pricing limits, rate limits, and terms.
+- Greenhouse and Lever are public hiring-signal sources; enrichment providers must respect API access, pricing limits, rate limits, and terms.
 - Google Sheets is the source-of-truth tracking layer through the connected Maton Google Workspace path.
 
 ## MVP Surfaces
 
 - KPI cards for daily activity.
+- Lead-source waterfall status.
 - Lead pipeline grouped by status.
 - Approval queue with draft preview and action buttons.
 - Follow-up queue.
@@ -26,6 +39,7 @@ Draft-only MVP for a targeted interview outreach pipeline inside OpenClaw Missio
 - `lib/job-outreach/schema.ts` — sheet tabs, headers, settings, and safe config defaults.
 - `lib/job-outreach/scoring.ts` — deterministic 0–100 lead scoring helper.
 - `components/job-outreach-mission-control.tsx` — Mission Control dashboard module.
+- `scripts/source-job-outreach-waterfall.mjs` — Greenhouse/Lever sourcing + enrichment waterfall.
 - `docs/job-outreach/CONFIG.example.json` — deploy/runtime config template.
 
 ## Live connector commands
@@ -35,8 +49,8 @@ All live commands load `/home/node/.openclaw/workspace/state/job-outreach-live.e
 ```bash
 npm run job-outreach:health
 npm run job-outreach:sync-settings
-npm run job-outreach:source-apollo -- --limit 20          # dry-run
-npm run job-outreach:source-apollo -- --limit 20 --commit # writes Leads + Outreach Queue
+npm run job-outreach:source-leads -- --limit 20          # dry-run
+npm run job-outreach:source-leads -- --limit 20 --commit # writes Leads + Outreach Queue + Activity Log + Daily Metrics
 npm run job-outreach:create-drafts -- --max 5             # dry-run approved queue rows
 npm run job-outreach:create-drafts -- --max 5 --commit    # creates Gmail drafts only
 ```

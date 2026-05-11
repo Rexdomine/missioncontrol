@@ -17,7 +17,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "job-outreach:health": "node scripts/job-outreach-health.mjs",
     "job-outreach:sync-settings": "node scripts/sync-job-outreach-settings.mjs",
-    "job-outreach:source-apollo": "node scripts/apollo-source-job-outreach-leads.mjs",
+    "job-outreach:source-leads": "node scripts/source-job-outreach-waterfall.mjs",
     "job-outreach:create-drafts": "node scripts/create-approved-gmail-drafts.mjs"
   },
   "dependencies": {

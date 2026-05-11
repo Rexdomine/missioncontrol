@@ -8,7 +8,19 @@
   "followUpDelays": { "first": 3, "second": 7, "final": 14 },
   "sender": { "name": "Princewill Ejiogu", "email": "ADD_APPROVED_SENDER_EMAIL" },
   "calendly": { "link": "ADD_CALENDLY_LINK" },
-  "apollo": { "enabled": true, "searchLimitPerRun": 50 },
+  "leadSourceWaterfall": {
+    "providers": ["Greenhouse public job API", "Lever public job API"],
+    "targetRoles": ["AI Native Fullstack Engineer", "AI Engineer", "Full Stack Engineer", "Product Engineer", "Founding Engineer"],
+    "targetCompanies": [
+      { "name": "Example AI", "domain": "example.ai", "greenhouseBoardToken": "example-ai" },
+      { "name": "Example SaaS", "domain": "example.com", "leverSlug": "example" }
+    ]
+  },
+  "enrichmentWaterfall": {
+    "primary": ["Findymail", "LeadMagic"],
+    "fallbackVerification": ["Hunter", "Dropcontact"],
+    "decisionMakerTitles": ["Founder", "CTO", "Head of Engineering", "Engineering Manager", "Talent Partner"]
+  },
   "googleSheets": { "spreadsheetName": "Job Outreach Pipeline", "spreadsheetId": "ADD_SPREADSHEET_ID" },
   "safety": {
     "requireApprovalBeforeSend": true,

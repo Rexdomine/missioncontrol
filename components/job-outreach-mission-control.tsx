@@ -184,9 +184,36 @@ const interviews = [
   },
 ];
 
+const sourceWaterfall = [
+  {
+    provider: "Greenhouse public jobs API",
+    role: "Primary hiring signal",
+    status: "Configured",
+    notes: "Find companies actively hiring for Rex’s target roles from public board tokens.",
+  },
+  {
+    provider: "Lever public postings API",
+    role: "Secondary hiring signal",
+    status: "Configured",
+    notes: "Fallback company-role discovery when Greenhouse is not available.",
+  },
+  {
+    provider: "Findymail / LeadMagic",
+    role: "Decision-maker enrichment",
+    status: "Needs API key",
+    notes: "Find founders, CTOs, engineering/product leaders, recruiters, and emails.",
+  },
+  {
+    provider: "Hunter / Dropcontact",
+    role: "Verification fallback",
+    status: "Needs API key",
+    notes: "Verify or enrich email data before qualified leads enter draft queue.",
+  },
+];
+
 function statusTone(status: LeadStatus | ReplyClass | string) {
-  if (["Qualified", "Drafted", "Positive", "Interview Booked", "Booked"].includes(status)) return "good";
-  if (["Sent", "Out of Office", "Pending", "Calendly pending"].includes(status)) return "warning";
+  if (["Qualified", "Drafted", "Positive", "Interview Booked", "Booked", "Configured"].includes(status)) return "good";
+  if (["Sent", "Out of Office", "Pending", "Calendly pending", "Needs API key"].includes(status)) return "warning";
   if (["Rejected", "Not Interested"].includes(status)) return "risk";
   return "active";
 }
@@ -214,7 +241,7 @@ export function JobOutreachMissionControl() {
     <section className="job-outreach-stack">
       <article className="panel-card outreach-safety-panel">
         <SectionHeader
-          detail="MVP is intentionally conservative: Apollo sourcing and Gmail execution must pass logging, scoring, suppression, and approval gates first."
+          detail="MVP is intentionally conservative: Greenhouse/Lever sourcing and Gmail execution must pass logging, scoring, suppression, enrichment, and approval gates first."
           eyebrow="Draft-only MVP"
           title="Interview Pipeline Mission Control"
         />
@@ -239,6 +266,27 @@ export function JobOutreachMissionControl() {
             <strong>Required</strong>
             <p className="detail-copy">Every source, draft, reply, follow-up, and booking is sheet-backed.</p>
           </div>
+        </div>
+      </article>
+
+      <article className="panel-card">
+        <SectionHeader
+          detail="Greenhouse and Lever identify active hiring signals first; enrichment providers only run after the company-role fit is clear."
+          eyebrow="Lead-source waterfall"
+          title="Public hiring APIs before enrichment"
+        />
+        <div className="outreach-table">
+          {sourceWaterfall.map((step) => (
+            <div className="outreach-row" key={step.provider}>
+              <div>
+                <strong>{step.provider}</strong>
+                <span>{step.role}</span>
+              </div>
+              <span className={`status-pill ${statusTone(step.status)}`}>{step.status}</span>
+              <p>{step.notes}</p>
+              <em>Logged to Activity Log</em>
+            </div>
+          ))}
         </div>
       </article>
 
@@ -431,7 +479,7 @@ export function JobOutreachMissionControl() {
             <p>Interviews booked: 0</p>
             <p>Follow-ups due tomorrow: 1</p>
             <p>Best lead segment: AI workflow / SaaS founders</p>
-            <p>Recommended improvement: add verified Calendly link and Apollo API key before live sourcing.</p>
+            <p>Recommended improvement: add target company board slugs plus Findymail or LeadMagic, then Hunter/Dropcontact for verification fallback.</p>
           </div>
         </article>
       </section>
