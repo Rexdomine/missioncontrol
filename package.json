@@ -19,6 +19,7 @@
     "job-outreach:sync-settings": "node scripts/sync-job-outreach-settings.mjs",
     "job-outreach:source-leads": "node scripts/source-job-outreach-waterfall.mjs",
     "job-outreach:separate-leads": "node scripts/separate-contactable-leads.mjs",
+    "job-outreach:process-queue": "node scripts/create-approved-gmail-drafts.mjs",
     "job-outreach:create-drafts": "node scripts/create-approved-gmail-drafts.mjs"
   },
   "dependencies": {

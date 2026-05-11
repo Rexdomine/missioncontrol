@@ -59,13 +59,13 @@ async function applyDataValidation(spreadsheetId) {
 
   if (outreachQueue?.sheetId !== undefined) {
     requests.push(
-      validationRequest({ sheetId: outreachQueue.sheetId, startColumnIndex: 6, endColumnIndex: 7, values: ["Pending", "Approved", "Rejected"] }),
-      validationRequest({ sheetId: outreachQueue.sheetId, startColumnIndex: 7, endColumnIndex: 8, values: ["Draft Only"] }),
+      validationRequest({ sheetId: outreachQueue.sheetId, startColumnIndex: 6, endColumnIndex: 7, values: ["Pending", "Approved", "Rejected", "Needs Rewrite"] }),
+      validationRequest({ sheetId: outreachQueue.sheetId, startColumnIndex: 7, endColumnIndex: 8, values: ["Send on Approval"] }),
     );
   }
   if (followUps?.sheetId !== undefined) {
     requests.push(
-      validationRequest({ sheetId: followUps.sheetId, startColumnIndex: 7, endColumnIndex: 8, values: ["Pending", "Approved", "Rejected"] }),
+      validationRequest({ sheetId: followUps.sheetId, startColumnIndex: 7, endColumnIndex: 8, values: ["Pending", "Approved", "Rejected", "Needs Rewrite"] }),
     );
   }
   if (!requests.length) return { validations: 0 };
@@ -102,8 +102,8 @@ const overrides = new Map([
   ["Daily Lead Source Limit", String(config.dailyLeadLimit)],
   ["Daily Email Send Limit", String(config.dailySendLimit)],
   ["Minimum Lead Score to Draft", String(config.minimumScoreToDraft)],
-  ["Sending Mode", "Draft Only"],
-  ["Auto Send", "Disabled"],
+  ["Sending Mode", "Send on Approval"],
+  ["Auto Send", "Approved rows send automatically"],
   ["Calendly Link", config.calendlyLink || "ADD_CALENDLY_LINK"],
   ["Sender Name", config.senderName],
   ["Sender Email", config.senderEmail || "ADD_APPROVED_SENDER_EMAIL"],

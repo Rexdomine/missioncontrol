@@ -87,7 +87,7 @@ const resumeLink = {
 const report = {
   ready:
     missing.length === 0 &&
-    config.mode === "draft_only" &&
+    config.mode === "approved_send" &&
     google.sheets.ok &&
     google.gmail.ok &&
     google.calendar.ok &&

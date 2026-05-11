@@ -168,8 +168,8 @@ export const jobOutreachSettings = [
   ["Follow-up 1 Delay", "3 days"],
   ["Follow-up 2 Delay", "7 days"],
   ["Final Follow-up Delay", "14 days"],
-  ["Sending Mode", "Draft Only"],
-  ["Auto Send", "Disabled"],
+  ["Sending Mode", "Send on Approval"],
+  ["Auto Send", "Approved rows send automatically"],
   ["Calendly Link", "ADD_CALENDLY_LINK"],
   ["Sender Name", "Princewill Ejiogu"],
   ["Sender Email", "ADD_APPROVED_SENDER_EMAIL"],
@@ -184,7 +184,7 @@ export const jobOutreachSettings = [
 
 export const jobOutreachConfig = {
   projectName: "Interview Pipeline Mission Control",
-  mode: "draft_only",
+  mode: "approved_send",
   dailyLeadLimit: 50,
   dailySendLimit: 25,
   minimumScoreToDraft: 70,

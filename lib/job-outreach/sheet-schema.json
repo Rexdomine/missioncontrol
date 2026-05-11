@@ -214,11 +214,11 @@
     ],
     [
       "Sending Mode",
-      "Draft Only"
+      "Send on Approval"
     ],
     [
       "Auto Send",
-      "Disabled"
+      "Approved rows send automatically"
     ],
     [
       "Calendly Link",
