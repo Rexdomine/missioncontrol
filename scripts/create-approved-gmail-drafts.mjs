@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import crypto from "node:crypto";
-import { buildInitialDraft } from "../lib/job-outreach/templates.mjs";
+import { buildInitialDraft, greetingName, reviewOutreachDraft } from "../lib/job-outreach/templates.mjs";
 import { getJobOutreachConfig, readOpenClawApiKey, validateLiveConfig } from "../lib/job-outreach/runtime-config.mjs";
 
 const SHEETS_BASE = "https://gateway.maton.ai/google-sheets/v4";
@@ -54,9 +54,13 @@ function buildMimeMessage({ to, from, subject, text, resumeUrl }) {
   return [`To: ${escapeHeader(to)}`, `From: ${escapeHeader(from)}`, `Subject: ${escapeHeader(subject)}`, 'Content-Type: text/plain; charset="UTF-8"', "MIME-Version: 1.0", "", ensureCvLink(text, resumeUrl), ""].join("\r\n");
 }
 function buildFollowUpBody({ firstName, company, resumeUrl }) {
-  const safeFirstName = firstName || "there";
+  const safeFirstName = greetingName({ firstName });
   const safeCompany = company || "your team";
-  return ensureCvLink(`Hi ${safeFirstName},\n\nJust following up on my note about AI/full-stack engineering support for ${safeCompany}.\n\nI think my background across React, Python/FastAPI, AI workflows, automation, integrations, and shipping production systems could be useful if your team needs someone who can move quickly from idea to working software.\n\nWould it be worth a quick conversation this week?\n\nBest,\nPrincewill Ejiogu\n\nP.S. If this is not relevant, feel free to let me know and I won’t follow up.`, resumeUrl);
+  const reviewed = reviewOutreachDraft({
+    subject: `Following up on AI/full-stack engineering support for ${safeCompany}`,
+    body: ensureCvLink(`Hi ${safeFirstName},\n\nJust following up on my note about AI/full-stack engineering support for ${safeCompany}.\n\nI think my background across React, Python/FastAPI, AI workflows, automation, integrations, and shipping production systems could be useful if your team needs someone who can move quickly from idea to working software.\n\nWould it be worth a quick conversation this week?\n\nBest,\nPrincewill Ejiogu\n\nP.S. If this is not relevant, feel free to let me know and I won’t follow up.`, resumeUrl),
+  }, { firstName, resumeUrl });
+  return reviewed.body;
 }
 function leadFromRow(row) {
   return {
@@ -249,6 +253,21 @@ for (const { row, index } of prioritizedQueueRows) {
   if (sentCount >= dailySendBudget) {
     results.push({ queueId: item.queueId, skipped: "daily_send_limit_reached", dailySendLimit: config.dailySendLimit, sentToday });
     break;
+  }
+
+  const reviewedDraft = reviewOutreachDraft({ subject: item.subject, body: item.body }, { firstName: lead.firstName, fullName: lead.fullName, email: lead.email, resumeUrl: config.resumeUrl });
+  const reviewIssues = reviewedDraft.review?.issues || [];
+  if (reviewedDraft.body !== item.body || reviewedDraft.subject !== item.subject) {
+    queueUpdate(rowNumber, row, { 4: reviewedDraft.subject, 5: reviewedDraft.body, 10: reviewIssues.length ? `Auto-reviewed before send: ${reviewIssues.join(", ")}` : "Auto-reviewed before send" });
+    item.subject = reviewedDraft.subject;
+    item.body = reviewedDraft.body;
+  }
+  activity.push(activityRow("Draft Review", "Outreach Template", lead.company, reviewedDraft.review?.status === "passed" ? "Passed" : "Needs Manual Review", `queue_id=${item.queueId}; issues=${reviewIssues.length ? reviewIssues.join(",") : "none"}`));
+  if (reviewedDraft.review?.status !== "passed") {
+    queueUpdate(rowNumber, row, { 6: "Needs Rewrite", 9: "Blocked", 10: `Draft review blocked send: ${reviewIssues.join(", ")}` });
+    results.push({ queueId: item.queueId, skipped: "draft_review_failed", issues: reviewIssues });
+    processed += 1;
+    continue;
   }
 
   if (!commit) {
