@@ -618,6 +618,14 @@ async function runSelfTest() {
   assert.equal(normalized.firstName, "Hiring");
   assert.equal(normalized.email, "careers@example.com");
 
+  const genericDraft = buildInitialDraft({ firstName: "Help", fullName: "Help", email: "help@example.com", company: "ExampleCo", title: "Hiring Team", angle: "Senior Full Stack Engineer", resumeUrl: "https://drive.google.com/example-cv" });
+  assert.match(genericDraft.body, /^Hi there,/);
+  assert.equal(genericDraft.review.status, "passed");
+
+  const personalDraft = buildInitialDraft({ firstName: "Ada", fullName: "Ada Lovelace", email: "ada@example.com", company: "ExampleCo", title: "CTO", angle: "Senior Full Stack Engineer", resumeUrl: "https://drive.google.com/example-cv" });
+  assert.match(personalDraft.body, /^Hi Ada,/);
+  assert.equal(personalDraft.review.status, "passed");
+
   const fetchedUrls = [];
   const previousFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
@@ -671,7 +679,7 @@ const hiringSignals = [];
 const leads = [];
 const queue = [];
 const activity = [...events];
-const metrics = { jobsChecked: jobs.length, hiringSignals: 0, contactableLeads: 0, enrichedContacts: 0, suppressed: 0, duplicates: 0, queuedDrafts: 0, manualReview: 0 };
+const metrics = { jobsChecked: jobs.length, hiringSignals: 0, contactableLeads: 0, enrichedContacts: 0, suppressed: 0, duplicates: 0, queuedDrafts: 0, draftReviews: 0, draftReviewIssues: 0, manualReview: 0 };
 
 for (const job of jobs) {
   const { contacts, attempts } = await enrichDecisionMakers(config, job);
@@ -737,7 +745,12 @@ for (const job of jobs) {
 
     if (scored.score >= config.minimumScoreToDraft && !["invalid", "undeliverable", "risky"].includes(String(verification.state).toLowerCase())) {
       const draft = buildInitialDraft({ firstName: person.firstName, fullName: person.fullName, email: person.email, company: person.company, title: person.title, angle, resumeUrl: config.resumeUrl });
-      queue.push([`queue_${crypto.randomUUID()}`, id, scored.priority, "Initial", draft.subject, draft.body, "Pending", "Send on Approval", "", "Not Sent", ""]);
+      const reviewIssues = draft.review?.issues || [];
+      const reviewStatus = draft.review?.status || "passed";
+      metrics.draftReviews += 1;
+      metrics.draftReviewIssues += reviewIssues.length;
+      queue.push([`queue_${crypto.randomUUID()}`, id, scored.priority, "Initial", draft.subject, draft.body, reviewStatus === "passed" ? "Pending" : "Needs Rewrite", "Send on Approval", "", "Not Sent", reviewStatus === "passed" ? "" : `Draft review needs manual check: ${reviewIssues.join(", ")}`]);
+      activity.push([`activity_${crypto.randomUUID()}`, nowIso(), "Draft Review", "Outreach Template", person.company, reviewStatus === "passed" ? "Passed" : "Needs Manual Review", `lead_id=${id}; issues=${reviewIssues.length ? reviewIssues.join(",") : "none"}`]);
       metrics.queuedDrafts += 1;
     }
   }

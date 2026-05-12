@@ -22,7 +22,8 @@
     "job-outreach:separate-leads": "node scripts/separate-contactable-leads.mjs",
     "job-outreach:process-queue": "node scripts/create-approved-gmail-drafts.mjs",
     "job-outreach:create-drafts": "node scripts/create-approved-gmail-drafts.mjs",
-    "job-outreach:sync-replies": "node scripts/sync-job-outreach-replies.mjs"
+    "job-outreach:sync-replies": "node scripts/sync-job-outreach-replies.mjs",
+    "job-outreach:review-drafts": "node scripts/review-job-outreach-drafts.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
