@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { getJobOutreachConfig, readOpenClawApiKey, validateLiveConfig } from "../lib/job-outreach/runtime-config.mjs";
 import { buildPersonalizationAngle, inferSignals, scoreLead } from "../lib/job-outreach/scoring.mjs";
@@ -78,6 +79,32 @@ function normalizeWebsite(urlOrDomain) {
 function domainFromWebsite(urlOrDomain) {
   try { return new URL(normalizeWebsite(urlOrDomain)).hostname.replace(/^www\./, ""); } catch { return String(urlOrDomain || "").replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]; }
 }
+function domainFromEmail(email) {
+  const domain = String(email || "").split("@")[1] || "";
+  return domain.replace(/^www\./, "").toLowerCase();
+}
+function isLikelyCompanyDomain(domain) {
+  if (!domain || !domain.includes(".")) return false;
+  return !/(^|\.)(himalayas\.app|remotive\.com|jobicy\.com|arbeitnow\.com|ycombinator\.com|news\.ycombinator\.com|greenhouse\.io|boards\.greenhouse\.io|lever\.co|api\.lever\.co|linkedin\.com|twitter\.com|x\.com|facebook\.com|instagram\.com|github\.com|google\.com|gmail\.com|outlook\.com|hotmail\.com|yahoo\.com|remotivecdn\.com|cloudfront\.net)$/i.test(domain);
+}
+function firstCompanyUrlFromText(text = "") {
+  const urls = String(text || "").match(/https?:\/\/[^\s<>)"]+/gi) || [];
+  return urls.map((url) => url.replace(/[.,;]+$/, "")).find((url) => isLikelyCompanyDomain(domainFromWebsite(url))) || "";
+}
+function inferCompanyDomain(job) {
+  const candidates = [
+    job.companyDomain,
+    domainFromWebsite(job.companyWebsite || ""),
+    domainFromEmail(job.publicContactEmail || ""),
+    domainFromWebsite(firstCompanyUrlFromText([job.description, job.raw?.description, job.raw?.text].join(" "))),
+  ];
+  return candidates.find(isLikelyCompanyDomain) || "";
+}
+function inferCompanyWebsite(job) {
+  const domain = inferCompanyDomain(job);
+  if (job.companyWebsite && isLikelyCompanyDomain(domainFromWebsite(job.companyWebsite))) return normalizeWebsite(job.companyWebsite);
+  return domain ? normalizeWebsite(domain) : (job.companyWebsite || "");
+}
 
 async function sheetsJson(url, { method = "GET", body } = {}) {
   const response = await fetch(url, {
@@ -122,11 +149,17 @@ function configuredCompanies(config) {
 }
 
 function normalizeJob(job, targetRoles) {
-  const score = opportunityScore(job, targetRoles);
+  const publicContactEmail = job.publicContactEmail || publicEmailFromText([job.description, job.raw?.text, job.raw?.description].join(" "));
+  const enrichedJob = { ...job, publicContactEmail };
+  const companyDomain = inferCompanyDomain(enrichedJob);
+  const companyWebsite = inferCompanyWebsite({ ...enrichedJob, companyDomain });
+  const score = opportunityScore({ ...enrichedJob, companyDomain, companyWebsite }, targetRoles);
   return {
     ...job,
+    companyWebsite,
+    companyDomain,
     applyUrl: job.applyUrl || job.jobUrl || "",
-    publicContactEmail: job.publicContactEmail || publicEmailFromText([job.description, job.raw?.text, job.raw?.description].join(" ")),
+    publicContactEmail,
     opportunityScore: score,
   };
 }
@@ -204,7 +237,7 @@ async function sourceRemotive(_config, targetRoles, limit) {
     .map((job) => normalizeJob({
       provider: "Remotive",
       companyName: job.company_name || "Unknown company",
-      companyWebsite: normalizeWebsite(job.company_logo ? "" : job.company_url || ""),
+      companyWebsite: normalizeWebsite(job.company_url || ""),
       companyDomain: domainFromWebsite(job.company_url || ""),
       jobTitle: job.title || "Open role",
       jobUrl: job.url || "",
@@ -446,6 +479,34 @@ async function enrichWithLeadMagic(config, job) {
   return [];
 }
 
+async function enrichWithHunterDomainSearch(config, job) {
+  if (!config.hunterApiKey || !job.companyDomain) return [];
+  const url = new URL(`${config.hunterApiBase.replace(/\/$/, "")}/v2/domain-search`);
+  url.searchParams.set("domain", job.companyDomain);
+  url.searchParams.set("limit", "10");
+  url.searchParams.set("api_key", config.hunterApiKey);
+  const data = await fetchJson(url.toString());
+  const emails = data.data?.emails || [];
+  const titleNeedles = config.decisionMakerTitles.map((title) => title.toLowerCase());
+  const ranked = emails
+    .filter((contact) => contact.value && !/^(noreply|no-reply|donotreply|do-not-reply|support|privacy|legal|abuse|security)@/i.test(contact.value))
+    .map((contact) => ({
+      contact,
+      rank: titleNeedles.some((title) => String(contact.position || "").toLowerCase().includes(title)) ? 0 : 1,
+    }))
+    .sort((a, b) => a.rank - b.rank || Number(b.contact.confidence || 0) - Number(a.contact.confidence || 0));
+  return ranked.slice(0, 2).map(({ contact }) => ({
+    provider: "Hunter Domain Search",
+    fullName: [contact.first_name, contact.last_name].filter(Boolean).join(" ") || contact.value.split("@")[0].replace(/[._-]+/g, " "),
+    firstName: contact.first_name || "",
+    lastName: contact.last_name || "",
+    email: contact.value || "",
+    linkedinUrl: contact.linkedin || "",
+    title: contact.position || "Decision-maker",
+    company: job.companyName,
+  }));
+}
+
 async function verifyWithHunter(config, email) {
   if (!config.hunterApiKey || !email) return { provider: "Hunter", state: "skipped", score: "" };
   const data = await fetchJson(`${config.hunterApiBase.replace(/\/$/, "")}/v2/email-verifier?email=${encodeURIComponent(email)}&api_key=${encodeURIComponent(config.hunterApiKey)}`);
@@ -470,9 +531,9 @@ async function enrichDecisionMakers(config, job) {
     return {
       contacts: [{
         provider: "Public Contact",
-        fullName: "",
-        firstName: "",
-        lastName: "",
+        fullName: "Hiring Team",
+        firstName: "Hiring",
+        lastName: "Team",
         email: job.publicContactEmail,
         linkedinUrl: "",
         title: "Hiring Team",
@@ -481,24 +542,35 @@ async function enrichDecisionMakers(config, job) {
       attempts,
     };
   }
-  for (const provider of [enrichWithFindymail, enrichWithLeadMagic]) {
+  const enrichers = [
+    { name: "Findymail", run: enrichWithFindymail },
+    { name: "LeadMagic", run: enrichWithLeadMagic },
+    { name: "Hunter Domain Search", run: enrichWithHunterDomainSearch },
+  ];
+  for (const provider of enrichers) {
     try {
-      const contacts = await provider(config, job);
-      attempts.push({ provider: provider === enrichWithFindymail ? "Findymail" : "LeadMagic", count: contacts.length, ok: true });
+      const contacts = await provider.run(config, job);
+      attempts.push({ provider: provider.name, count: contacts.length, ok: true });
       if (contacts.length) return { contacts, attempts };
     } catch (error) {
-      attempts.push({ provider: provider === enrichWithFindymail ? "Findymail" : "LeadMagic", count: 0, ok: false, error: error.message });
+      attempts.push({ provider: provider.name, count: 0, ok: false, error: error.message });
     }
   }
   return { contacts: [{ provider: "Manual Review", company: job.companyName, title: "Decision-maker needed", email: "" }], attempts };
 }
 
+function isContactableContact(contact) {
+  if (!contact.email) return false;
+  return Boolean(contact.name || contact.fullName || contact.full_name || contact.firstName || contact.first_name || contact.provider === "Public Contact");
+}
+
 function normalizeContact(contact, job) {
-  const fullName = contact.full_name || contact.fullName || contact.name || [contact.first_name || contact.firstName, contact.last_name || contact.lastName].filter(Boolean).join(" ");
+  const emailLocalPart = String(contact.email || "").split("@")[0]?.replace(/[._-]+/g, " ").trim();
+  const fullName = contact.full_name || contact.fullName || contact.name || [contact.first_name || contact.firstName, contact.last_name || contact.lastName].filter(Boolean).join(" ") || (contact.provider === "Public Contact" ? "Hiring Team" : emailLocalPart);
   const [fallbackFirst, ...fallbackLast] = fullName.split(" ");
   return {
-    firstName: contact.first_name || contact.firstName || fallbackFirst || "",
-    lastName: contact.last_name || contact.lastName || fallbackLast.join(" ") || "",
+    firstName: contact.first_name || contact.firstName || fallbackFirst || (contact.provider === "Public Contact" ? "Hiring" : ""),
+    lastName: contact.last_name || contact.lastName || fallbackLast.join(" ") || (contact.provider === "Public Contact" ? "Team" : ""),
     fullName,
     email: contact.email || contact.email_address || "",
     linkedinUrl: contact.linkedin_url || contact.linkedinUrl || "",
@@ -518,11 +590,68 @@ function normalizeContact(contact, job) {
   };
 }
 
+async function runSelfTest() {
+  const remotiveJob = normalizeJob({
+    provider: "Remotive",
+    companyName: "ExampleCo",
+    companyWebsite: normalizeWebsite("example.com"),
+    companyDomain: domainFromWebsite("example.com"),
+    company_logo: "https://remotivecdn.com/logo.png",
+    jobTitle: "Senior Full Stack Engineer",
+    jobUrl: "https://remotive.com/remote-jobs/software-dev/senior-full-stack-engineer",
+    applyUrl: "https://remotive.com/remote-jobs/software-dev/senior-full-stack-engineer",
+    publicContactEmail: "",
+    location: "Remote",
+    department: "Software Development",
+    description: "Build AI systems. Email careers@example.com or visit https://example.com/careers.",
+    raw: {},
+  }, ["Full Stack Engineer"]);
+  assert.equal(remotiveJob.companyDomain, "example.com");
+  assert.equal(remotiveJob.companyWebsite, "https://example.com");
+  assert.equal(remotiveJob.publicContactEmail, "careers@example.com");
+
+  const { contacts } = await enrichDecisionMakers({ hunterApiKey: "" }, remotiveJob);
+  assert.equal(contacts[0].provider, "Public Contact");
+  assert.equal(isContactableContact(contacts[0]), true);
+  const normalized = normalizeContact(contacts[0], remotiveJob);
+  assert.equal(normalized.fullName, "Hiring Team");
+  assert.equal(normalized.firstName, "Hiring");
+  assert.equal(normalized.email, "careers@example.com");
+
+  const fetchedUrls = [];
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    fetchedUrls.push(String(url));
+    return {
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      text: async () => JSON.stringify({ data: { emails: [{ value: "cto@example.com", first_name: "Ada", last_name: "Lovelace", position: "CTO", confidence: 96 }] } }),
+    };
+  };
+  try {
+    const hunterContacts = await enrichWithHunterDomainSearch({ hunterApiKey: "hunter-key", hunterApiBase: "https://api.hunter.io", decisionMakerTitles: ["CTO"] }, { ...remotiveJob, publicContactEmail: "" });
+    assert.equal(hunterContacts[0].provider, "Hunter Domain Search");
+    assert.equal(hunterContacts[0].email, "cto@example.com");
+    assert.match(fetchedUrls[0], /domain=example\.com/);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+
+  console.log("source-job-outreach-waterfall self-test passed");
+}
+
 function rowKey(row, index) { return String(row[index] || "").trim().toLowerCase(); }
 
 const args = parseArgs(process.argv.slice(2));
+if (args["self-test"]) {
+  await runSelfTest();
+  process.exit(0);
+}
 const commit = Boolean(args.commit);
-const limit = Number(args.limit || getJobOutreachConfig().dailyLeadLimit || 50);
+const runtimeConfig = getJobOutreachConfig();
+const limit = Number(args.limit || runtimeConfig.dailyLeadLimit || 50);
+const minContactable = args["min-contactable"] === undefined ? 0 : Number(args["min-contactable"] || 0);
 const { config, missing } = validateLiveConfig({ allowMissingSourcingKeys: true });
 if (missing.length) throw new Error(`Missing required live config: ${missing.join(", ")}`);
 if (!["draft_only", "approved_send"].includes(config.mode)) throw new Error(`Refusing sourcing while mode is ${config.mode}; expected draft_only or approved_send.`);
@@ -547,7 +676,7 @@ const metrics = { jobsChecked: jobs.length, hiringSignals: 0, contactableLeads: 
 for (const job of jobs) {
   const { contacts, attempts } = await enrichDecisionMakers(config, job);
   for (const attempt of attempts) activity.push([`activity_${crypto.randomUUID()}`, nowIso(), "Enrichment", attempt.provider, job.companyName, attempt.ok ? "Success" : "Error", attempt.ok ? `Returned ${attempt.count} contact(s)` : attempt.error]);
-  const contactableContacts = contacts.filter((contact) => Boolean(contact.email) && Boolean(contact.name || contact.fullName || contact.full_name));
+  const contactableContacts = contacts.filter(isContactableContact);
   metrics.enrichedContacts += contactableContacts.length;
   if (!contactableContacts.length) metrics.manualReview += 1;
   const signalId = stableId("signal", [job.provider, job.companyName, job.jobTitle, job.jobUrl]);
@@ -636,7 +765,20 @@ for (const job of jobs) {
   }
 }
 
-const metricRow = [todayDate(), metrics.hiringSignals, metrics.contactableLeads, leads.filter((row) => row[18] === "Qualified").length, queue.length, 0, 0, 0, 0, 0, metrics.suppressed, "Free-first public API waterfall", `sources=Himalayas,Remotive,Jobicy,Arbeitnow,HN,Greenhouse,Lever; contacts=${metrics.enrichedContacts}; duplicates=${metrics.duplicates}; manual_review_opportunities=${metrics.manualReview}`];
+const zeroContactableWarning = jobs.length > 0 && metrics.contactableLeads === 0;
+if (zeroContactableWarning) {
+  activity.push([
+    `activity_${crypto.randomUUID()}`,
+    nowIso(),
+    "Sourcing Warning",
+    "Daily Source",
+    "Contact-ready lead creation",
+    "Warning",
+    `Checked ${jobs.length} hiring signal(s) but produced zero contactable leads/drafts; inspect domain extraction and enrichment credentials.`,
+  ]);
+}
+
+const metricRow = [todayDate(), metrics.hiringSignals, metrics.contactableLeads, leads.filter((row) => row[18] === "Qualified").length, queue.length, 0, 0, 0, 0, 0, metrics.suppressed, "Free-first public API waterfall", `sources=Himalayas,Remotive,Jobicy,Arbeitnow,HN,Greenhouse,Lever; contacts=${metrics.enrichedContacts}; duplicates=${metrics.duplicates}; manual_review_opportunities=${metrics.manualReview}; zero_contactable_warning=${zeroContactableWarning}`];
 
 if (commit) {
   await appendRows(config.spreadsheetId, "Hiring Signals", hiringSignals);
@@ -646,4 +788,8 @@ if (commit) {
   await appendRows(config.spreadsheetId, "Daily Metrics", [metricRow]);
 }
 
-console.log(JSON.stringify({ commit, jobsChecked: jobs.length, insertedHiringSignals: hiringSignals.length, insertedContactableLeads: leads.length, queuedDrafts: queue.length, activityEvents: activity.length, metrics }, null, 2));
+console.log(JSON.stringify({ commit, jobsChecked: jobs.length, insertedHiringSignals: hiringSignals.length, insertedContactableLeads: leads.length, queuedDrafts: queue.length, activityEvents: activity.length, zeroContactableWarning, metrics }, null, 2));
+
+if (commit && minContactable > 0 && leads.length < minContactable) {
+  throw new Error(`Daily sourcing produced ${leads.length} contactable lead(s), below required minimum ${minContactable}. Check enrichment/provider health instead of silently passing.`);
+}
