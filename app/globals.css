@@ -2285,3 +2285,120 @@ input:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sdf-grid {
+  align-items: start;
+}
+
+.sdf-intro-panel {
+  background:
+    radial-gradient(circle at top right, rgba(15, 94, 82, 0.13), transparent 28%),
+    linear-gradient(180deg, rgba(255, 251, 245, 0.98), rgba(241, 250, 247, 0.94));
+}
+
+.sdf-model-grid,
+.sdf-mode-grid,
+.sdf-task-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sdf-task-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.sdf-model-grid div,
+.sdf-mode-card,
+.sdf-roadmap-card,
+.sdf-readiness-card,
+.sdf-two-row div {
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(92, 74, 46, 0.09);
+}
+
+.sdf-model-grid span,
+.sdf-two-row span {
+  display: inline-flex;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sdf-model-grid span {
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+
+.sdf-model-grid h3,
+.sdf-mode-card h3,
+.sdf-readiness-card h2 {
+  margin: 10px 0 0;
+  line-height: 1.3;
+}
+
+.sdf-model-grid p,
+.sdf-two-row p,
+.sdf-roadmap-card p,
+.sdf-readiness-card p {
+  margin: 10px 0 0;
+  color: #344256;
+  line-height: 1.6;
+}
+
+.sdf-two-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.sdf-two-row div {
+  padding: 12px;
+  background: rgba(255, 251, 245, 0.78);
+}
+
+.sdf-pipeline-rail,
+.sdf-agent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sdf-roadmap-card strong {
+  display: block;
+  margin-top: 12px;
+  color: var(--accent-deep);
+  line-height: 1.45;
+}
+
+@media (max-width: 1120px) {
+  .sdf-model-grid,
+  .sdf-mode-grid,
+  .sdf-task-list,
+  .sdf-two-row {
+    grid-template-columns: 1fr;
+  }
+}
