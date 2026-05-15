@@ -1,6 +1,7 @@
 export type ModuleKey =
   | "today"
   | "agent-os"
+  | "sdf"
   | "projects"
   | "calendar"
   | "job-hunt"
@@ -434,9 +435,59 @@ export interface OperatingCadenceItem {
   output: string;
 }
 
+export interface SdfFactoryMode {
+  id: string;
+  name: "Assisted" | "Factory" | "Autopilot";
+  state: "Available" | "Recommended" | "Guarded";
+  bestFor: string;
+  rexRole: string;
+  agentBehavior: string;
+}
+
+export interface SdfPipelineStage {
+  id: string;
+  label: string;
+  status: "Done" | "Active" | "Next" | "Blocked";
+  owner: string;
+  detail: string;
+}
+
+export interface SdfPhaseTask {
+  id: string;
+  phase: string;
+  title: string;
+  status: "Ready" | "In progress" | "Waiting" | "Queued";
+  owner: string;
+  outputs: string[];
+}
+
+export interface SdfAgentLane {
+  id: string;
+  name: string;
+  role: string;
+  state: "Lead" | "Ready" | "Queued" | "Review";
+  handoff: string;
+}
+
+export interface SdfQualityGate {
+  id: string;
+  label: string;
+  status: "Required" | "Satisfied" | "Next";
+  evidence: string;
+}
+
+export interface SdfRexInput {
+  id: string;
+  title: string;
+  priority: "P1" | "P2" | "P3";
+  neededFor: string;
+  prompt: string;
+}
+
 export const sidebarItems: SidebarItem[] = [
   { key: "today", label: "Today", href: "/", status: "live" },
   { key: "agent-os", label: "Agent OS", href: "/agent-os", status: "live" },
+  { key: "sdf", label: "SDF", href: "/sdf", status: "live" },
   { key: "projects", label: "Projects", href: "/projects", status: "live" },
   { key: "calendar", label: "Calendar", href: "/calendar", status: "live" },
   { key: "job-hunt", label: "Job Outreach", href: "/job-hunt", status: "live" },
@@ -446,6 +497,152 @@ export const sidebarItems: SidebarItem[] = [
   { key: "trust", label: "Trust", href: "/trust", status: "live" },
   { key: "handoff", label: "Handoff", href: "/handoff", status: "live" },
   { key: "chat", label: "Chat", href: "/chat", status: "live" },
+];
+
+export const sdfFactoryModes: SdfFactoryMode[] = [
+  {
+    id: "mode-assisted",
+    name: "Assisted",
+    state: "Available",
+    bestFor: "Exploration, ambiguous briefs, design taste calls, and projects where Rex wants high-touch steering.",
+    rexRole: "Approve scope, answer open questions, and review checkpoints before implementation expands.",
+    agentBehavior: "StarLord and Thor prepare options, tradeoffs, and small validated slices before asking for direction.",
+  },
+  {
+    id: "mode-factory",
+    name: "Factory",
+    state: "Recommended",
+    bestFor: "Known product work with a clear outcome, reviewable PRs, and parallel helper-agent lanes.",
+    rexRole: "Set outcome and constraints, then review checkpoint packets and PR readiness summaries.",
+    agentBehavior: "Thor breaks the brief into phases, delegates specialist lanes, enforces gates, and ships review-ready branches.",
+  },
+  {
+    id: "mode-autopilot",
+    name: "Autopilot",
+    state: "Guarded",
+    bestFor: "Low-risk maintenance, verified repeat workflows, and future approved factory routines.",
+    rexRole: "Define standing boundaries and receive exception alerts when a gate fails or risk changes.",
+    agentBehavior: "Agents execute within pre-approved lanes, stop at sensitive actions, and publish evidence without merging automatically.",
+  },
+];
+
+export const sdfPipelineStages: SdfPipelineStage[] = [
+  {
+    id: "pipeline-intake",
+    label: "Intake brief",
+    status: "Done",
+    owner: "StarLord",
+    detail: "Capture objective, repo, constraints, success criteria, and approval boundaries before work starts.",
+  },
+  {
+    id: "pipeline-plan",
+    label: "Phase breakdown",
+    status: "Done",
+    owner: "Thor Lead Engineer",
+    detail: "Turn the brief into small implementation phases, interfaces, likely files, checks, and smoke paths.",
+  },
+  {
+    id: "pipeline-build",
+    label: "Build lanes",
+    status: "Active",
+    owner: "Helper agents",
+    detail: "Frontend, backend, QA, docs, reviewer, and DevOps lanes work from the same task graph without mixing branches.",
+  },
+  {
+    id: "pipeline-review",
+    label: "Checkpoint review",
+    status: "Next",
+    owner: "Rex + StarLord",
+    detail: "Present changed surfaces, verification, risks, screenshots/routes, and open decisions before moving to the next phase.",
+  },
+];
+
+export const sdfPhaseTasks: SdfPhaseTask[] = [
+  {
+    id: "task-intake",
+    phase: "01 · Intake",
+    title: "Project intake packet",
+    status: "Ready",
+    owner: "StarLord",
+    outputs: ["Objective", "Constraints", "Repo/branch", "Rex input points"],
+  },
+  {
+    id: "task-architecture",
+    phase: "02 · Plan",
+    title: "Architecture and task graph",
+    status: "In progress",
+    owner: "Thor Lead Engineer",
+    outputs: ["Phase list", "Agent lanes", "Interfaces", "Verification plan"],
+  },
+  {
+    id: "task-frontend",
+    phase: "03 · Build",
+    title: "Frontend surface and design intake",
+    status: "Queued",
+    owner: "Frontend Builder",
+    outputs: ["Route shell", "Reusable components", "Responsive UX", "Route smoke"],
+  },
+  {
+    id: "task-backend",
+    phase: "04 · Integrate",
+    title: "Task creation and persistence seam",
+    status: "Queued",
+    owner: "Backend Builder",
+    outputs: ["Typed schema", "Storage adapter", "Audit trail", "Failure states"],
+  },
+  {
+    id: "task-release",
+    phase: "05 · Review",
+    title: "Quality gate and PR checkpoint",
+    status: "Waiting",
+    owner: "Reviewer + QA",
+    outputs: ["Self-check", "Build evidence", "PR summary", "Rex review packet"],
+  },
+];
+
+export const sdfAgentLanes: SdfAgentLane[] = [
+  { id: "lane-thor", name: "Thor Lead Engineer", role: "Owns architecture, repo hygiene, phase plan, and final PR gate.", state: "Lead", handoff: "Branch, commit, PR, verification, and blockers." },
+  { id: "lane-frontend", name: "Frontend Builder", role: "Builds routes, UI states, responsive layout, and design-system fit.", state: "Ready", handoff: "Screens, components, route smoke, accessibility notes." },
+  { id: "lane-backend", name: "Backend Builder", role: "Defines APIs, schemas, persistence seams, and integration contracts.", state: "Queued", handoff: "Typed contracts, data flow, error states, migration notes." },
+  { id: "lane-qa", name: "QA", role: "Finds regressions, validates acceptance criteria, and records reproducible evidence.", state: "Review", handoff: "Test matrix, failed checks, smoke proof, risk calls." },
+  { id: "lane-reviewer", name: "Reviewer", role: "Checks scope discipline, architecture drift, quality gates, and PR clarity.", state: "Ready", handoff: "Review notes, required fixes, merge/readiness recommendation." },
+  { id: "lane-docs", name: "Docs/Handoff", role: "Packages decisions, instructions, next phase, and restart-safe context.", state: "Ready", handoff: "Roadmap, docs, memory updates, next-resume notes." },
+  { id: "lane-devops", name: "DevOps", role: "Verifies preview/deploy path, env boundaries, and operational rollback notes.", state: "Queued", handoff: "Build logs, preview status, runtime caveats, release guardrails." },
+];
+
+export const sdfQualityGates: SdfQualityGate[] = [
+  { id: "gate-brief", label: "Brief", status: "Satisfied", evidence: "Objective, scope, repo, branch, and non-merge boundary are explicit." },
+  { id: "gate-implementation", label: "Implementation", status: "Required", evidence: "Focused branch with typed data, route, navigation, and reusable UI shell." },
+  { id: "gate-self-check", label: "Self-check", status: "Required", evidence: "Developer review catches naming drift, hidden coupling, and UX gaps before PR." },
+  { id: "gate-review", label: "Review", status: "Next", evidence: "Reviewer lane confirms the slice is coherent and production-safe." },
+  { id: "gate-integration", label: "Integration", status: "Next", evidence: "Route fits existing Mission Control layout and does not break current modules." },
+  { id: "gate-verification", label: "Verification", status: "Required", evidence: "Lint, typecheck, build, and local route smoke must pass before handoff." },
+  { id: "gate-pr", label: "PR", status: "Required", evidence: "Fresh PR into main is required; no direct push or automatic merge." },
+  { id: "gate-rex-review", label: "Rex review", status: "Next", evidence: "Rex receives a checkpoint packet with changed files, risks, and Phase 2 recommendation." },
+];
+
+export const sdfRexInputQueue: SdfRexInput[] = [
+  {
+    id: "input-intake-form",
+    title: "Approve Phase 2 intake fields",
+    priority: "P1",
+    neededFor: "Functional SDF task creation flow",
+    prompt: "Which inputs should be mandatory when Rex starts a new build: repo, target route, design asset, deadline, risk level, or all of them?",
+  },
+  {
+    id: "input-autopilot-boundaries",
+    title: "Define Autopilot boundaries",
+    priority: "P2",
+    neededFor: "Safe factory automation",
+    prompt: "Which work types can run without a fresh confirmation, and which must always stop for approval?",
+  },
+  {
+    id: "input-agent-capacity",
+    title: "Choose helper-agent depth",
+    priority: "P3",
+    neededFor: "Parallel lane orchestration",
+    prompt: "Should Phase 2 start with one Thor-led queue or expose separate frontend/backend/QA lane assignment controls?",
+  },
 ];
 
 export const agentStatuses: AgentStatus[] = [
@@ -1480,6 +1677,7 @@ export const recommendationItems: RecommendationItem[] = [
 export const unifiedSearchItems: UnifiedSearchItem[] = [
   { id: "search-workflow-health", label: "Workflow health", module: "approvals", href: "/approvals", keywords: ["approvals", "alerts", "connector", "cron"], summary: "Alert severity, run history, approval anomalies, and connector health." },
   { id: "search-agent-os", label: "Agent OS cockpit", module: "agent-os", href: "/agent-os", keywords: ["agents", "tasks", "skills", "orchestration"], summary: "Execution controls, continuity, gates, orchestration, and trust entry points." },
+  { id: "search-sdf", label: "Software Development Factory", module: "sdf", href: "/sdf", keywords: ["sdf", "factory", "build", "agents", "quality gates"], summary: "Engineering factory model, helper-agent lanes, quality gates, and Rex review checkpoints." },
   { id: "search-gallery", label: "Birthday content shoot", module: "projects", href: "/projects?project=birthday-content", keywords: ["gallery", "birthday", "content", "May 8"], summary: "Project and content prep for the gallery shoot." },
   { id: "search-role-hunt", label: "Remote role hunt", module: "job-hunt", href: "/job-hunt", keywords: ["jobs", "roles", "shortlist", "Tavily"], summary: "Daily/weekly role-search outputs and application pipeline." },
   { id: "search-command", label: "Command StarLord", module: "chat", href: "/chat", keywords: ["chat", "command", "workflow", "prompt"], summary: "Staged command surface for launching multi-step workflows." },
@@ -1499,6 +1697,7 @@ export const multiStepWorkflows: MultiStepWorkflow[] = [
 
 export const contextualAssistantPanels: ContextualAssistantPanel[] = [
   { id: "assistant-agent-os", module: "agent-os", title: "Agent OS guidance", guidance: "Use the cockpit to decide whether a task needs execution, monitoring, or memory continuity before opening a module.", suggestedPrompt: "What should move next across agents, projects, and workflow health?" },
+  { id: "assistant-sdf", module: "sdf", title: "SDF guidance", guidance: "Use the factory view to turn a product idea into intake, phases, agent lanes, quality gates, and reviewable PR checkpoints.", suggestedPrompt: "Start a new SDF build from this product brief and identify Rex input points." },
   { id: "assistant-approvals", module: "approvals", title: "Workflow health guidance", guidance: "Treat alerts as source-linked diagnostics: resolve connector failures before escalating stale approval noise.", suggestedPrompt: "Explain which workflow health issue will become friction first." },
   { id: "assistant-content", module: "content", title: "Content guidance", guidance: "Connect content assets to calendar commitments so birthday shoot planning turns into published output.", suggestedPrompt: "Build the next content action from calendar and project context." },
 ];
@@ -1848,6 +2047,7 @@ export const quickActions = [
 
 export function getActiveModule(pathname: string): ModuleKey {
   if (pathname === "/agent-os") return "agent-os";
+  if (pathname === "/sdf") return "sdf";
   if (pathname === "/approvals") return "approvals";
   if (pathname === "/orchestration") return "orchestration";
   if (pathname === "/trust") return "trust";
