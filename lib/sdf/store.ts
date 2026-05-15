@@ -643,7 +643,17 @@ export async function submitOpenClawSessionBridge(id: string, body: unknown): Pr
     }
 
     const requestedIdempotencyKey = parsed.idempotencyKey ?? execution.idempotencyKey;
-    const submissionIdempotencyKey = buildOpenClawSessionSubmissionIdempotencyKey({ executionId: execution.id, handoffId: execution.handoffId, requestedKey: requestedIdempotencyKey, action: parsed.action });
+    const approvalProof = parsed.approvalProof;
+    const requestFingerprint = stableHash([
+      requestedIdempotencyKey,
+      parsed.target.targetId,
+      parsed.target.agentId,
+      parsed.target.operator,
+      parsed.target.mode,
+      parsed.allowlistedRepoPath,
+      approvalProof?.approvalIntent ?? "missing-approval-proof",
+    ].join("|"));
+    const submissionIdempotencyKey = buildOpenClawSessionSubmissionIdempotencyKey({ executionId: execution.id, handoffId: execution.handoffId, requestedKey: requestFingerprint, action: parsed.action });
     const existing = (execution.submissionAttempts ?? []).find((attempt) => attempt.idempotencyKey === submissionIdempotencyKey);
     if (existing) {
       const updated = appendAudit(checkedRun, {
@@ -657,7 +667,6 @@ export async function submitOpenClawSessionBridge(id: string, body: unknown): Pr
     }
 
     const auditEventId = generateId("operator-session-submission-audit");
-    const approvalProof = parsed.approvalProof;
     const request: OpenClawSessionsBridgeRequest = {
       schemaVersion: OPENCLAW_SESSIONS_BRIDGE_SCHEMA_VERSION,
       runId: checkedRun.id,
