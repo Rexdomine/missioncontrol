@@ -2402,3 +2402,174 @@ input:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+.sdf-intake-card {
+  background: linear-gradient(180deg, rgba(255, 250, 242, 0.98), rgba(247, 240, 229, 0.94));
+}
+
+.sdf-intake-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sdf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sdf-field span,
+.sdf-generated-task h4,
+.sdf-task-footer span,
+.sdf-run-summary span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sdf-field input,
+.sdf-field select,
+.sdf-field textarea {
+  width: 100%;
+  border: 1px solid rgba(92, 74, 46, 0.16);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+  padding: 13px 14px;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.sdf-field textarea {
+  min-height: 118px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.sdf-field input:focus,
+.sdf-field select:focus,
+.sdf-field textarea:focus,
+.sdf-mode-select:focus-visible {
+  border-color: rgba(15, 94, 82, 0.7);
+  box-shadow: 0 0 0 3px rgba(15, 94, 82, 0.14);
+}
+
+.sdf-run-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.sdf-run-summary div {
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(92, 74, 46, 0.09);
+}
+
+.sdf-run-summary strong {
+  display: block;
+  font-size: 1.55rem;
+  color: var(--accent-deep);
+}
+
+.sdf-generated-graph,
+.sdf-mode-stack,
+.sdf-agent-board,
+.sdf-checkpoint-list,
+.sdf-rex-input-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sdf-generated-task,
+.sdf-agent-card,
+.sdf-checkpoint-card,
+.sdf-mode-select {
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(92, 74, 46, 0.09);
+}
+
+.sdf-generated-task {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sdf-task-body-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sdf-task-body-grid > div {
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255, 251, 245, 0.78);
+  border: 1px solid rgba(92, 74, 46, 0.08);
+}
+
+.sdf-generated-task h4 {
+  margin: 0 0 8px;
+}
+
+.sdf-task-footer {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid rgba(92, 74, 46, 0.1);
+  padding-top: 12px;
+}
+
+.sdf-task-footer span {
+  color: #344256;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 650;
+}
+
+.sdf-mode-select {
+  appearance: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.sdf-mode-select p,
+.sdf-agent-card p,
+.sdf-checkpoint-card p {
+  color: #344256;
+  line-height: 1.6;
+  margin: 10px 0 0;
+}
+
+.sdf-mode-select.selected {
+  background: linear-gradient(135deg, rgba(15, 94, 82, 0.12), rgba(217, 239, 232, 0.88));
+  border-color: rgba(15, 94, 82, 0.34);
+}
+
+.compact-sdf-list {
+  grid-template-columns: 1fr;
+  margin-top: 0;
+}
+
+.sdf-rex-input-list {
+  margin-top: 12px;
+}
+
+@media (max-width: 1120px) {
+  .sdf-intake-form,
+  .sdf-run-summary,
+  .sdf-task-body-grid {
+    grid-template-columns: 1fr;
+  }
+}
