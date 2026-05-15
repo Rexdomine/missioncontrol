@@ -21,8 +21,8 @@ export type SyncSource = "live" | "manual" | "simulated";
 export type LaunchApprovalState = "draft" | "requested" | "approved" | "rejected" | "launched";
 export type LaunchQueueState = "queued" | "blocked" | "approved" | "dispatched-ready" | "cancelled" | "completed" | "failed";
 export type LiveAdapterStatus = "configured" | "not-configured" | "blocked";
-export type DispatchMode = "dry-run" | "review" | "live";
-export type DispatchOutcome = "planned" | "blocked" | "idempotent-hit";
+export type DispatchMode = "dry-run" | "review" | "review-dispatch" | "operator-handoff" | "live";
+export type DispatchOutcome = "planned" | "prepared" | "blocked" | "idempotent-hit";
 export type DispatchAdapterKind = "thor-agent" | "github-write" | "notification";
 export type AuditAction =
   | "run.created"
@@ -37,8 +37,10 @@ export type AuditAction =
   | "dispatch.previewed"
   | "dispatch.blocked"
   | "dispatch.dry-run-approved"
+  | "dispatch.review-prepared"
   | "dispatch.adapter.checked"
-  | "dispatch.policy.failed";
+  | "dispatch.policy.failed"
+  | "operator.handoff-ready";
 
 export type GeneratedTask = {
   id: string;
@@ -105,9 +107,27 @@ export type ApprovalPolicyStatus = {
   state: "blocked" | "ready-for-approval" | "approved" | "dispatch-ready";
   readyForDispatch: boolean;
   canQueue: boolean;
+  canPrepareReviewDispatch: boolean;
   canDispatchExternalWork: boolean;
   reasons: string[];
   requirements: Array<{ id: string; label: string; passed: boolean; detail: string }>;
+};
+
+export type ThorReviewHandoff = {
+  id: string;
+  runId: string;
+  jobId: string;
+  idempotencyKey: string;
+  state: "blocked" | "waiting-for-operator" | "operator-running" | "done";
+  adapter: "thor-helper-review";
+  reviewModeOnly: boolean;
+  externalExecution: boolean;
+  preparedAt: string;
+  packet: string;
+  packetHash: string;
+  approvalIntent: "rex-approved-review-dispatch";
+  operatorNextAction: string;
+  blockerReasons: string[];
 };
 
 export type LaunchQueueJob = {
@@ -123,8 +143,9 @@ export type LaunchQueueJob = {
   createdAt: string;
   updatedAt: string;
   blockedReasons: string[];
-  dispatchAdapter: "none" | "safe-backend";
+  dispatchAdapter: "none" | "safe-backend" | "thor-helper-review";
   auditNote: string;
+  reviewHandoff?: ThorReviewHandoff;
 };
 
 export type DispatchAdapterCapability = {
@@ -172,6 +193,7 @@ export type DispatchAttempt = {
   idempotencyKey: string;
   outcome: DispatchOutcome;
   plan: DispatchPlan;
+  reviewHandoff?: ThorReviewHandoff;
   requestedBy: "Rex" | "Thor" | "System";
   createdAt: string;
   updatedAt: string;
@@ -215,7 +237,7 @@ export type SdfRunRegistryResponse = {
   };
   dispatcher: {
     status: "review-only";
-    defaultMode: "dry-run";
+    defaultMode: "dry-run" | "review-dispatch";
     liveExecutionEnabled: boolean;
     summary: string;
     adapters: DispatchAdapterCapability[];

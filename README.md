@@ -87,9 +87,23 @@ Security notes:
 
 Phase 1 of the Agent OS is intentionally frontend-first. It establishes the operating model, typed seed data, and reviewable UI surfaces before replacing the static data with real telemetry from sessions, commands, memory, tools, GitHub, and scheduler state.
 
+## Software Development Factory Phase 7
+
+SDF Phase 7 adds the first controlled review-dispatch path for `/sdf`:
+
+- server-only Thor/helper review adapter abstraction at `lib/sdf/thor-launch-adapter.ts`
+- `POST /api/sdf/runs/[id]/dispatch` support for `review-dispatch` / `operator-handoff`
+- explicit `approvalIntent: "rex-approved-review-dispatch"` before handoff preparation
+- idempotent prepared handoff packets for approved queue jobs
+- queue state transition to `dispatched-ready` when the review-mode operator packet is prepared
+- non-secret audit events for adapter checks, policy failures, review dispatch prepared, blocked dispatch, and operator handoff readiness
+- UI controls that show approval, queued/prepared/waiting-for-operator state, handoff packet metadata, idempotency key, latest dispatch result, and exact operator next action
+
+Phase 7 still performs no direct external execution. The web app does not spawn Thor/helper agents, mutate GitHub, send notifications, write production, or run unreviewed automation. StarLord/Thor must execute the prepared packet outside the app in review mode. See `docs/sdf-phase7.md` for approval requirements, adapter boundaries, API examples, and the Phase 8 launch-bridge path.
+
 ## Software Development Factory Phase 6
 
-SDF Phase 6 adds the backend-only dispatcher review foundation for `/sdf`:
+SDF Phase 6 added the backend-only dispatcher review foundation for `/sdf`:
 
 - server-only dispatcher module at `lib/sdf/dispatcher.ts`
 - `POST /api/sdf/runs/[id]/dispatch` for explicit dry-run/review dispatch previews
@@ -98,7 +112,7 @@ SDF Phase 6 adds the backend-only dispatcher review foundation for `/sdf`:
 - non-secret audit events for preview, blocked dispatch, approved dry-run, adapter checks, and policy failures
 - UI controls that show the latest dispatch plan, live blocker reasons, and why external writes remain disabled
 
-Phase 6 still performs no live external side effects by default. Agent spawning, GitHub mutations, outbound messages, and production writes remain blocked until Phase 7+ explicitly enables least-privilege adapters. See `docs/sdf-phase6.md` for the dispatcher architecture and live execution path.
+Phase 6 performed no live external side effects by default. Agent spawning, GitHub mutations, outbound messages, and production writes remained blocked. See `docs/sdf-phase6.md` for the dispatcher architecture.
 
 ## Software Development Factory Phase 5
 

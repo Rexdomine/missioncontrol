@@ -2,18 +2,19 @@ import "server-only";
 
 import { stableHash } from "./approval-policy";
 import { buildTaskPacket, generateId, nowIso } from "./factory";
-import type { DispatchAdapterCapability, DispatchAttempt, DispatchMode, DispatchPlan, DispatchPlanStep, FactoryRun, LaunchQueueJob } from "./types";
+import { buildThorReviewHandoffIdempotencyKey, getThorReviewAdapterReadiness, prepareThorReviewHandoff } from "./thor-launch-adapter";
+import type { DispatchAdapterCapability, DispatchAttempt, DispatchMode, DispatchPlan, DispatchPlanStep, FactoryRun, LaunchQueueJob, ThorReviewHandoff } from "./types";
 
 export const dispatchAdapters: DispatchAdapterCapability[] = [
   {
     kind: "thor-agent",
-    label: "Thor/helper-agent launch adapter",
-    status: "blocked",
+    label: "Thor/helper-agent review-mode handoff adapter",
+    status: getThorReviewAdapterReadiness().status,
     readOnly: false,
     writeEnabled: false,
     requiresApproval: true,
     supportsDryRun: true,
-    blocker: "Phase 6 only prepares reviewed dispatch plans. Live agent spawning is disabled until Phase 7 wiring and explicit Rex approval.",
+    blocker: getThorReviewAdapterReadiness().blocker,
   },
   {
     kind: "github-write",
@@ -23,7 +24,7 @@ export const dispatchAdapters: DispatchAdapterCapability[] = [
     writeEnabled: false,
     requiresApproval: true,
     supportsDryRun: true,
-    blocker: "GitHub write scopes are intentionally not configured. Phase 6 may describe comments/statuses but never mutates GitHub.",
+    blocker: "GitHub write scopes are intentionally not configured. Phase 7 may prepare a Thor/helper handoff only; it never mutates GitHub.",
   },
   {
     kind: "notification",
@@ -33,46 +34,55 @@ export const dispatchAdapters: DispatchAdapterCapability[] = [
     writeEnabled: false,
     requiresApproval: true,
     supportsDryRun: true,
-    blocker: "Outbound messages are disabled for SDF dispatch until a least-privilege Phase 7 notification adapter is approved.",
+    blocker: "Outbound messages are disabled for SDF dispatch. Phase 7 does not send Telegram, email, Slack, or webhook notifications.",
   },
 ];
 
 export function getDispatcherReadiness() {
   return {
     status: "review-only" as const,
-    defaultMode: "dry-run" as const,
+    defaultMode: "review-dispatch" as const,
     liveExecutionEnabled: false,
-    summary: "Dispatcher is available for backend-only dry-run/review planning. All live external-write adapters are disabled.",
+    summary: "Phase 7 can prepare approved Thor/helper review-mode operator handoffs. No GitHub writes, notifications, production writes, or direct agent spawning are enabled.",
     adapters: dispatchAdapters,
   };
 }
 
-function planSteps(run: FactoryRun, job: LaunchQueueJob): DispatchPlanStep[] {
+function isReviewDispatchMode(mode: DispatchMode) {
+  return mode === "review-dispatch" || mode === "operator-handoff";
+}
+
+function planSteps(run: FactoryRun, job: LaunchQueueJob, mode: DispatchMode): DispatchPlanStep[] {
+  const reviewDispatch = isReviewDispatchMode(mode);
   return [
     {
       id: "prepare-agent-packet",
       adapter: "thor-agent",
-      action: "Prepare Thor/helper-agent launch packet from approved SDF queue job.",
-      dryRunOnly: true,
+      action: reviewDispatch
+        ? "Prepare Thor/helper-agent review-mode operator handoff packet from approved SDF queue job."
+        : "Preview Thor/helper-agent launch packet from approved SDF queue job.",
+      dryRunOnly: !reviewDispatch,
       externalWrite: false,
       approvalRequired: true,
-      status: job.approvalPolicy.readyForDispatch || job.approvalState === "approved" ? "ready" : "blocked",
-      detail: job.approvalState === "approved" ? "Packet can be reviewed in dry-run mode; no agent process is spawned." : "Rex approval must be recorded before dry-run dispatch planning is approved.",
+      status: job.approvalPolicy.canPrepareReviewDispatch ? "ready" : "blocked",
+      detail: job.approvalState === "approved"
+        ? "Packet can be prepared for StarLord/Thor operator execution in review mode; the web app does not spawn an agent."
+        : "Rex approval must be recorded before review dispatch preparation is allowed.",
     },
     {
       id: "review-github-handoff",
       adapter: "github-write",
-      action: `Review intended GitHub handoff for ${run.prCheckpoint.branch || "pending branch"} without comments, statuses, pushes, or workflow dispatches.`,
+      action: `Show intended GitHub handoff for ${run.prCheckpoint.branch || "pending branch"} without comments, statuses, pushes, or workflow dispatches.`,
       dryRunOnly: true,
       externalWrite: false,
       approvalRequired: true,
       status: "blocked",
-      detail: "Write adapter disabled. Phase 6 can show intended PR/status handoff only.",
+      detail: "Write adapter disabled. Phase 7 only records operator handoff context; GitHub mutation is out of scope.",
     },
     {
       id: "review-notification",
       adapter: "notification",
-      action: "Review notification copy that would be sent after live dispatch in a later phase.",
+      action: "Show the future notification boundary without sending any outbound message.",
       dryRunOnly: true,
       externalWrite: false,
       approvalRequired: true,
@@ -85,21 +95,27 @@ function planSteps(run: FactoryRun, job: LaunchQueueJob): DispatchPlanStep[] {
 export function findDispatchableJob(run: FactoryRun, requestedJobId?: string) {
   const jobs = run.launchQueue ?? [];
   if (requestedJobId) return jobs.find((job) => job.id === requestedJobId) ?? null;
-  return jobs.find((job) => job.state === "approved" || job.state === "dispatched-ready") ?? jobs[0] ?? null;
+  return jobs.find((job) => job.state === "dispatched-ready" || job.state === "approved") ?? jobs[0] ?? null;
 }
 
 export function buildDispatchPlan(run: FactoryRun, job: LaunchQueueJob, mode: DispatchMode = "dry-run"): DispatchPlan {
   const packetHash = stableHash(buildTaskPacket(run));
   const liveExecutionBlocked = true;
   const policyReasons = job.approvalPolicy.reasons ?? [];
+  const reviewDispatch = isReviewDispatchMode(mode);
   const approvedForDryRun = mode !== "live" && job.approvalState === "approved" && job.approvalPolicy.canQueue;
-  const adapterBlockers = dispatchAdapters.filter((adapter) => !adapter.writeEnabled).map((adapter) => adapter.blocker);
+  const adapterBlockers = dispatchAdapters.filter((adapter) => adapter.kind !== "thor-agent" && !adapter.writeEnabled).map((adapter) => adapter.blocker);
+  const reviewAdapterBlockers = job.approvalPolicy.canPrepareReviewDispatch ? [] : policyReasons;
   const blockerReasons = [
-    ...(job.approvalState === "approved" ? [] : ["Rex approval must be recorded before dispatch review can be approved."]),
+    ...(job.approvalState === "approved" ? [] : ["Explicit Rex approval must be stored before review dispatch can be prepared."]),
     ...(job.approvalPolicy.canQueue ? [] : policyReasons),
-    ...(mode === "live" ? ["Live dispatch is disabled in Phase 6. Use dry-run/review mode only.", ...adapterBlockers] : adapterBlockers),
+    ...(reviewDispatch ? reviewAdapterBlockers : []),
+    ...(mode === "live" ? ["Live dispatch is disabled in Phase 7. Use review-dispatch/operator-handoff mode only."] : []),
+    ...adapterBlockers,
   ].filter(Boolean);
-  const idempotencyKey = stableHash([run.id, job.id, job.idempotencyKey, packetHash, mode, "phase6-dispatch-review-v1"].join("|"));
+  const idempotencyKey = reviewDispatch
+    ? buildThorReviewHandoffIdempotencyKey(run, job)
+    : stableHash([run.id, job.id, job.idempotencyKey, packetHash, mode, "phase7-dispatch-review-v1"].join("|"));
 
   return {
     id: `dispatch-plan-${idempotencyKey}`,
@@ -110,18 +126,25 @@ export function buildDispatchPlan(run: FactoryRun, job: LaunchQueueJob, mode: Di
     createdAt: nowIso(),
     approvedForDryRun,
     liveExecutionBlocked,
-    summary: approvedForDryRun
-      ? "Approved queue job is ready for Phase 6 dry-run dispatch review. No external side effects will occur."
-      : "Dispatch review is blocked until approval/policy requirements are satisfied; live execution remains disabled.",
+    summary: reviewDispatch && job.approvalPolicy.canPrepareReviewDispatch
+      ? "Approved queue job can be prepared as a Phase 7 Thor/helper review-mode operator handoff. No external side effects will occur."
+      : approvedForDryRun
+        ? "Approved queue job is ready for dry-run dispatch review. No external side effects will occur."
+        : "Dispatch review is blocked until approval/policy requirements are satisfied; live execution remains disabled.",
     blockerReasons,
     adapters: dispatchAdapters,
-    steps: planSteps(run, job),
+    steps: planSteps(run, job, mode),
   };
 }
 
-export function createDispatchAttempt(run: FactoryRun, job: LaunchQueueJob, mode: DispatchMode, requestedBy: DispatchAttempt["requestedBy"] = "System"): DispatchAttempt {
+export function createDispatchAttempt(run: FactoryRun, job: LaunchQueueJob, mode: DispatchMode, requestedBy: DispatchAttempt["requestedBy"] = "System", handoff?: ThorReviewHandoff): DispatchAttempt {
   const plan = buildDispatchPlan(run, job, mode);
-  const outcome = mode === "live" || !plan.approvedForDryRun ? "blocked" : "planned";
+  const reviewDispatch = isReviewDispatchMode(mode);
+  const outcome = mode === "live" || (!reviewDispatch && !plan.approvedForDryRun) || (reviewDispatch && handoff?.state === "blocked")
+    ? "blocked"
+    : reviewDispatch
+      ? "prepared"
+      : "planned";
   const timestamp = nowIso();
   return {
     id: generateId("dispatch-attempt"),
@@ -131,11 +154,18 @@ export function createDispatchAttempt(run: FactoryRun, job: LaunchQueueJob, mode
     idempotencyKey: plan.idempotencyKey,
     outcome,
     plan,
+    reviewHandoff: handoff,
     requestedBy,
     createdAt: timestamp,
     updatedAt: timestamp,
-    note: outcome === "planned"
-      ? "Dry-run dispatch plan recorded. No external agents, GitHub writes, messages, or production mutations were performed."
-      : "Dispatch blocked by Phase 6 review/live-adapter safety policy. No external side effects occurred.",
+    note: outcome === "prepared"
+      ? "Thor/helper review-mode handoff prepared for StarLord/Thor operator execution. The web app did not spawn agents, write GitHub, send messages, or mutate production."
+      : outcome === "planned"
+        ? "Dry-run dispatch plan recorded. No external agents, GitHub writes, messages, or production mutations were performed."
+        : "Dispatch blocked by Phase 7 review/live-adapter safety policy. No external side effects occurred.",
   };
+}
+
+export function createThorReviewHandoff(run: FactoryRun, job: LaunchQueueJob) {
+  return prepareThorReviewHandoff(run, job);
 }
