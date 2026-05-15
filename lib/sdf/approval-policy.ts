@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "crypto";
 import { buildTaskPacket } from "./factory";
 import { getGitHubLiveReadiness } from "./github";
+import { getThorReviewAdapterReadiness } from "./thor-launch-adapter";
 import type { ApprovalPolicyStatus, FactoryRun, LaunchApprovalState, LaunchQueueState } from "./types";
 
 export function stableHash(value: string) {
@@ -33,6 +34,7 @@ export function evaluateApprovalPolicy(run: FactoryRun, options: { approvalState
   const prExpectationsPresent = Boolean(run.prCheckpoint.branch && run.prCheckpoint.commit && run.prCheckpoint.checkStatus);
   const launchPacketGenerated = packet.length > 120;
   const rexApproved = approvalState === "approved" || approvalState === "launched";
+  const reviewAdapter = getThorReviewAdapterReadiness();
   const dispatchAdapterReady = false;
 
   const requirements = [
@@ -61,21 +63,28 @@ export function evaluateApprovalPolicy(run: FactoryRun, options: { approvalState
       detail: prExpectationsPresent ? `${run.prCheckpoint.branch} · ${run.prCheckpoint.commit} · ${run.prCheckpoint.checkStatus}` : "Branch, commit, and check expectations must be visible.",
     },
     {
-      id: "live-adapter",
-      label: "Live adapter configured before dispatch",
-      passed: !options.dispatchRequested || (liveReadiness.configured && dispatchAdapterReady),
+      id: "thor-review-adapter",
+      label: "Thor/helper review adapter available",
+      passed: !options.dispatchRequested || reviewAdapter.enabled,
       detail: options.dispatchRequested
-        ? "Dispatch requires a future safe backend adapter plus server-only credentials. Phase 5 intentionally does not dispatch."
-        : liveReadiness.configured
-          ? "Read-only GitHub sync is configured; write/dispatch adapter is still disabled."
-          : liveReadiness.blocker,
+        ? reviewAdapter.blocker
+        : "Phase 7 review-mode adapter can prepare an operator handoff only; it never spawns agents from the web app.",
+    },
+    {
+      id: "external-write-adapters",
+      label: "External write adapters remain disabled",
+      passed: !options.dispatchRequested || !dispatchAdapterReady,
+      detail: liveReadiness.configured
+        ? "Read-only GitHub sync may be configured, but GitHub writes, notifications, and direct agent spawning remain disabled."
+        : liveReadiness.blocker,
     },
   ];
 
   const reasons = requirements.filter((requirement) => !requirement.passed).map((requirement) => requirement.detail);
   const canQueue = launchPacketGenerated && prExpectationsPresent;
-  const canDispatchExternalWork = rexApproved && blockersClear && liveReadiness.configured && dispatchAdapterReady;
-  const readyForDispatch = canDispatchExternalWork;
+  const canPrepareReviewDispatch = canQueue && rexApproved && blockersClear && reviewAdapter.enabled;
+  const canDispatchExternalWork = false;
+  const readyForDispatch = canPrepareReviewDispatch;
   const state: ApprovalPolicyStatus["state"] = readyForDispatch
     ? "dispatch-ready"
     : rexApproved
@@ -84,7 +93,7 @@ export function evaluateApprovalPolicy(run: FactoryRun, options: { approvalState
         ? "ready-for-approval"
         : "blocked";
 
-  return { state, readyForDispatch, canQueue, canDispatchExternalWork, reasons, requirements };
+  return { state, readyForDispatch, canQueue, canPrepareReviewDispatch, canDispatchExternalWork, reasons, requirements };
 }
 
 export function chooseLaunchQueueState(policy: ApprovalPolicyStatus, approvalState: LaunchApprovalState): LaunchQueueState {

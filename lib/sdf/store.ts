@@ -3,7 +3,7 @@ import path from "path";
 import { z } from "zod";
 import { appendAudit, buildReadiness, buildTaskPacket, buildTimeline, createLaunchRequest, createRun, createSeedRuns, defaultApprovalPolicy, defaultGitHubLiveReadiness, generateId, generateTaskGraph, nowIso } from "./factory";
 import { chooseLaunchQueueState, deriveLaunchIdempotencyKey, evaluateApprovalPolicy, stableHash } from "./approval-policy";
-import { buildDispatchPlan, createDispatchAttempt, findDispatchableJob, getDispatcherReadiness } from "./dispatcher";
+import { buildDispatchPlan, createDispatchAttempt, createThorReviewHandoff, findDispatchableJob, getDispatcherReadiness } from "./dispatcher";
 import { getGitHubLiveReadiness, readGitHubCheckpoint } from "./github";
 import type { BuildIntake, DispatchAttempt, DispatchMode, FactoryRun, FactoryRunState, LaunchApprovalState, LaunchQueueJob, SdfRunRegistryResponse } from "./types";
 
@@ -24,7 +24,7 @@ const intakeSchema = z.object({
 
 const stateSchema = z.enum(["Draft", "Ready to launch", "Running", "Blocked", "Review ready", "PR open", "Done"]);
 const approvalSchema = z.enum(["draft", "requested", "approved", "rejected", "launched"]);
-const dispatchModeSchema = z.enum(["dry-run", "review", "live"]);
+const dispatchModeSchema = z.enum(["dry-run", "review", "review-dispatch", "operator-handoff", "live"]);
 
 async function ensureStore() {
   await fs.mkdir(dataDir, { recursive: true });
@@ -225,7 +225,7 @@ export async function prepareLaunchRequest(id: string, body: unknown): Promise<F
       return updated;
     }
 
-    const launchRequest = { ...request, approvalState, updatedAt: nowIso(), launchReady: policy.state === "approved" || policy.state === "dispatch-ready", nextAction: policy.canDispatchExternalWork ? "Dispatch adapter is ready." : "Queue is prepared, but external dispatch remains blocked by Phase 5 approval/adapter policy." };
+    const launchRequest = { ...request, approvalState, updatedAt: nowIso(), launchReady: policy.state === "approved" || policy.state === "dispatch-ready", nextAction: policy.canPrepareReviewDispatch ? "Review-mode Thor/helper operator handoff can be prepared; no web-app agent spawn will occur." : "Queue is prepared, but review dispatch remains blocked until Rex approval, blockers, and adapter policy pass." };
     const queueState = chooseLaunchQueueState(policy, approvalState);
     const packetHash = stableHash(buildTaskPacket(run));
     const job: LaunchQueueJob = {
@@ -241,9 +241,9 @@ export async function prepareLaunchRequest(id: string, body: unknown): Promise<F
       createdAt: nowIso(),
       updatedAt: nowIso(),
       blockedReasons: policy.reasons,
-      dispatchAdapter: "none",
+      dispatchAdapter: policy.canPrepareReviewDispatch ? "safe-backend" : "none",
       auditNote: parsed.dispatchRequested
-        ? "Dispatch was requested but Phase 5 has no safe external-write adapter; job is retained for Phase 6 readiness."
+        ? "Dispatch was requested; Phase 7 can prepare only a Thor/helper review-mode operator handoff. No direct agent spawn or external write occurred."
         : "Launch job queued/prepared only. No external agent, GitHub write, message, or production mutation was dispatched.",
     };
 
@@ -269,14 +269,16 @@ export async function dispatchLaunchJob(id: string, body: unknown): Promise<{ ru
       mode: dispatchModeSchema.default("dry-run"),
       dryRun: z.boolean().optional(),
       reviewOnly: z.boolean().optional(),
-      intent: z.enum(["preview", "dry-run", "review", "live"]).default("preview"),
+      intent: z.enum(["preview", "dry-run", "review", "review-dispatch", "operator-handoff", "live"]).default("preview"),
+      approvalIntent: z.enum(["rex-approved-review-dispatch"]).optional(),
       jobId: z.string().optional(),
       requestedBy: z.enum(["Rex", "Thor", "System"]).default("System"),
     })
     .parse(body ?? {});
 
-  const explicitReviewIntent = parsed.dryRun === true || parsed.reviewOnly === true || parsed.intent === "preview" || parsed.intent === "dry-run" || parsed.intent === "review" || parsed.mode === "review" || parsed.mode === "dry-run";
-  const requestedMode: DispatchMode = parsed.intent === "live" ? "live" : parsed.mode;
+  const explicitReviewIntent = parsed.dryRun === true || parsed.reviewOnly === true || parsed.intent === "preview" || parsed.intent === "dry-run" || parsed.intent === "review" || parsed.intent === "review-dispatch" || parsed.intent === "operator-handoff" || parsed.mode === "review" || parsed.mode === "dry-run" || parsed.mode === "review-dispatch" || parsed.mode === "operator-handoff";
+  const requestedMode: DispatchMode = parsed.intent === "live" || parsed.intent === "review-dispatch" || parsed.intent === "operator-handoff" ? parsed.intent : parsed.mode;
+  const reviewDispatchRequested = requestedMode === "review-dispatch" || requestedMode === "operator-handoff";
 
   const runs = await readRunsUnsafe();
   let result: { run: FactoryRun; dispatch: DispatchAttempt } | null = null;
@@ -286,7 +288,7 @@ export async function dispatchLaunchJob(id: string, body: unknown): Promise<{ ru
     const checkedRun = appendAudit(normalizeRun({ ...run, updatedAt: nowIso() }), {
       action: "dispatch.adapter.checked",
       actor: "System",
-      summary: "Dispatcher adapter readiness checked; all live write adapters remain disabled in Phase 6.",
+      summary: "Dispatcher adapter readiness checked; Phase 7 only permits Thor/helper review-mode handoff preparation while live write adapters remain disabled.",
       metadata: { adapterCount: getDispatcherReadiness().adapters.length, liveExecutionEnabled: false },
     });
 
@@ -322,27 +324,64 @@ export async function dispatchLaunchJob(id: string, body: unknown): Promise<{ ru
     const existing = (checkedRun.dispatchAttempts ?? []).find((attempt) => attempt.idempotencyKey === previewPlan.idempotencyKey);
     if (existing) {
       const updated = appendAudit(checkedRun, {
-        action: "dispatch.previewed",
+        action: reviewDispatchRequested ? "operator.handoff-ready" : "dispatch.previewed",
         actor: "System",
         summary: `Existing dispatch ${existing.outcome} record returned for idempotency key ${existing.idempotencyKey}.`,
-        metadata: { jobId: job.id, mode: requestedMode, idempotent: true, outcome: existing.outcome },
+        metadata: { jobId: job.id, mode: requestedMode, idempotent: true, outcome: existing.outcome, reviewDispatchRequested },
       });
       result = { run: normalizeRun(updated), dispatch: { ...existing, outcome: "idempotent-hit" } };
       return result.run;
     }
 
-    const attempt = createDispatchAttempt(checkedRun, job, requestedMode, parsed.requestedBy);
-    const action = requestedMode === "live" || !explicitReviewIntent || attempt.outcome === "blocked" ? "dispatch.blocked" : "dispatch.dry-run-approved";
+    if (reviewDispatchRequested && parsed.approvalIntent !== "rex-approved-review-dispatch") {
+      const blockedAttempt = {
+        ...createDispatchAttempt(checkedRun, job, requestedMode, parsed.requestedBy, {
+          ...createThorReviewHandoff(checkedRun, job),
+          idempotencyKey: `${previewPlan.idempotencyKey}-missing-intent`,
+          state: "blocked",
+          blockerReasons: ["Request intent must include approvalIntent=rex-approved-review-dispatch for Phase 7 review-mode handoff."],
+          operatorNextAction: "Record explicit Rex approval intent in the dispatch request, then retry review-dispatch.",
+        }),
+        idempotencyKey: `${previewPlan.idempotencyKey}-missing-intent`,
+      };
+      const updated = appendAudit(normalizeRun({ ...checkedRun, dispatchAttempts: [blockedAttempt, ...(checkedRun.dispatchAttempts ?? [])], updatedAt: nowIso() }), {
+        action: "dispatch.policy.failed",
+        actor: "System",
+        summary: "Review dispatch blocked because explicit Rex approval intent was missing from the request.",
+        metadata: { jobId: job.id, mode: requestedMode, approvalIntentPresent: false },
+      });
+      result = { run: normalizeRun(updated), dispatch: blockedAttempt };
+      return result.run;
+    }
+
+    const handoff = reviewDispatchRequested ? createThorReviewHandoff(checkedRun, job) : undefined;
+    const attempt = createDispatchAttempt(checkedRun, job, requestedMode, parsed.requestedBy, handoff);
+    const preparedJob: LaunchQueueJob = handoff && attempt.outcome === "prepared"
+      ? { ...job, state: "dispatched-ready", dispatchAdapter: "thor-helper-review", reviewHandoff: handoff, updatedAt: nowIso(), auditNote: "Phase 7 Thor/helper review-mode operator handoff prepared. Waiting for StarLord/Thor operator execution; no web-app external side effects occurred." }
+      : job;
+    const launchQueue = (checkedRun.launchQueue ?? []).map((item) => item.id === job.id ? preparedJob : item);
+    const action = requestedMode === "live" || !explicitReviewIntent || attempt.outcome === "blocked" ? "dispatch.blocked" : reviewDispatchRequested ? "dispatch.review-prepared" : "dispatch.dry-run-approved";
+    const summary = attempt.outcome === "prepared"
+      ? "Thor/helper review-mode handoff prepared and marked waiting for operator; no external side effects occurred."
+      : attempt.outcome === "planned"
+        ? "Approved dry-run dispatch plan recorded; no external side effects occurred."
+        : "Dispatch was blocked by Phase 7 safety policy; no external side effects occurred.";
     const updated = appendAudit(
-      normalizeRun({ ...checkedRun, dispatchAttempts: [attempt, ...(checkedRun.dispatchAttempts ?? [])], updatedAt: nowIso() }),
+      normalizeRun({ ...checkedRun, launchQueue, dispatchAttempts: [attempt, ...(checkedRun.dispatchAttempts ?? [])], updatedAt: nowIso() }),
       {
         action: action === "dispatch.blocked" && attempt.outcome === "blocked" && job.approvalState !== "approved" ? "dispatch.policy.failed" : action,
         actor: "System",
-        summary: attempt.outcome === "planned" ? "Approved dry-run dispatch plan recorded; no external side effects occurred." : "Dispatch was blocked by Phase 6 safety policy; no external side effects occurred.",
-        metadata: { jobId: job.id, mode: requestedMode, outcome: attempt.outcome, explicitReviewIntent, liveExecutionBlocked: attempt.plan.liveExecutionBlocked },
+        summary,
+        metadata: { jobId: job.id, mode: requestedMode, outcome: attempt.outcome, explicitReviewIntent, reviewDispatchRequested, liveExecutionBlocked: attempt.plan.liveExecutionBlocked },
       },
     );
-    result = { run: normalizeRun(updated), dispatch: attempt };
+    const withHandoffAudit = attempt.outcome === "prepared" ? appendAudit(updated, {
+      action: "operator.handoff-ready",
+      actor: "System",
+      summary: "Operator handoff packet is ready for StarLord/Thor review-mode execution outside the web app.",
+      metadata: { jobId: job.id, handoffId: handoff?.id ?? null, idempotencyKey: handoff?.idempotencyKey ?? null },
+    }) : updated;
+    result = { run: normalizeRun(withHandoffAudit), dispatch: attempt };
     return result.run;
   });
 

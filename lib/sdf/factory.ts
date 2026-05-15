@@ -39,6 +39,7 @@ export const defaultApprovalPolicy: ApprovalPolicyStatus = {
   state: "blocked",
   readyForDispatch: false,
   canQueue: false,
+  canPrepareReviewDispatch: false,
   canDispatchExternalWork: false,
   reasons: ["No approval policy evaluation has been recorded yet."],
   requirements: [
@@ -212,7 +213,7 @@ export function createLaunchRequest(run: FactoryRun, approvalNote = "Prepared pa
     updatedAt: timestamp,
     launchReady,
     nextAction: launchReady
-      ? "Rex can approve this prepared packet; a future Phase 5 adapter may then launch Thor/helper agents."
+      ? "Rex can approve this prepared packet; Phase 7 may then prepare a review-mode Thor/helper operator handoff without spawning agents."
       : "Resolve readiness blockers before Rex approves launch.",
   };
 }

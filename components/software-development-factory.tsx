@@ -23,7 +23,7 @@ type ReviewCheckpoint = {
 
 function statusTone(status: string) {
   if (["Blocked", "Guarded", "Waiting", "Input needed", "Failing", "Changes requested", "Not connected", "rejected", "blocked", "cancelled", "failed"].includes(status)) return "risk";
-  if (["Active", "In progress", "Recommended", "Lead", "Ready", "Running", "Passing", "Approved", "Done", "Complete", "approved", "launched", "live", "queued", "dispatched-ready", "configured"].includes(status)) return "active";
+  if (["Active", "In progress", "Recommended", "Lead", "Ready", "Running", "Passing", "Approved", "Done", "Complete", "approved", "prepared", "waiting-for-operator", "launched", "live", "queued", "dispatched-ready", "configured"].includes(status)) return "active";
   return "warning";
 }
 
@@ -57,7 +57,7 @@ function buildReviewCheckpoints(intake: BuildIntake, tasks: ReturnType<typeof ge
     {
       label: "Execution safety",
       state: "Review",
-      detail: "The web app prepares and records launch packets only. Real agent spawning remains behind Rex approval and a future safe backend adapter.",
+      detail: "The web app prepares and records launch packets only. Phase 7 can prepare a Thor/helper review-mode operator handoff, but it still does not spawn agents itself.",
     },
     {
       label: "Blocked",
@@ -67,7 +67,7 @@ function buildReviewCheckpoints(intake: BuildIntake, tasks: ReturnType<typeof ge
     {
       label: "Approval/review",
       state: intake.mode === "Autopilot" ? "Review" : "Ready",
-      detail: "Rex approval is logged before any future external action, branch push, PR open, or live helper-agent launch.",
+      detail: "Rex approval is logged before review dispatch. GitHub writes, notifications, and live helper-agent spawning remain out of scope.",
     },
   ];
 }
@@ -102,7 +102,7 @@ function FieldGroup({
 function IntegrationNotice({ adapter, error }: { adapter: SdfRunRegistryResponse["adapter"] | null; error: string }) {
   return (
     <div className="sdf-notice" role="note">
-      <strong>Phase 6 dispatcher safety layer:</strong> SDF now reads and writes runs through typed API routes backed by a safe server file adapter ({adapter?.source ?? "loading"}), can attempt read-only GitHub PR/check sync from server env, queues launch jobs idempotently behind approval policy, and previews dispatch plans in dry-run/review mode only. {error ? `Current API issue: ${error}` : "External writes and real agent dispatch remain blocked until explicit Phase 7 adapter approval."}
+      <strong>Phase 7 controlled review dispatch:</strong> SDF now reads and writes runs through typed API routes backed by a safe server file adapter ({adapter?.source ?? "loading"}), can attempt read-only GitHub PR/check sync, queues launch jobs idempotently behind approval policy, and prepares only Thor/helper review-mode operator handoffs. {error ? `Current API issue: ${error}` : "GitHub writes, notifications, production writes, and web-app agent spawning remain disabled."}
     </div>
   );
 }
@@ -170,6 +170,8 @@ export function SoftwareDevelopmentFactoryModule({
   const latestLaunch = selectedRun?.launchRequests[0];
   const latestQueueJob = selectedRun?.launchQueue?.[0];
   const latestRecordedDispatch = selectedRun?.dispatchAttempts?.[0];
+  const activeDispatch = latestDispatch ?? latestRecordedDispatch;
+  const latestHandoff = latestQueueJob?.reviewHandoff ?? activeDispatch?.reviewHandoff;
 
   function updateIntake(field: keyof BuildIntake, value: string) {
     setIntake((current) => ({ ...current, [field]: value }));
@@ -245,7 +247,7 @@ export function SoftwareDevelopmentFactoryModule({
       const response = await fetch(`/api/sdf/runs/${selectedRun.id}/launch-requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approvalState, approvalNote: approvalState === "approved" ? "Rex approval state recorded; Phase 4 still does not spawn real agents." : undefined }),
+        body: JSON.stringify({ approvalState, approvalNote: approvalState === "approved" ? "Rex approval recorded for Phase 7 review-mode Thor/helper handoff only; no web-app agent spawn is allowed." : undefined }),
       });
       if (!response.ok) throw new Error(`Launch request failed with ${response.status}`);
       const updated = (await response.json()) as FactoryRun;
@@ -257,7 +259,7 @@ export function SoftwareDevelopmentFactoryModule({
     }
   }
 
-  async function previewDispatch(mode: "dry-run" | "review" | "live" = "dry-run") {
+  async function previewDispatch(mode: "dry-run" | "review" | "review-dispatch" | "operator-handoff" | "live" = "dry-run") {
     if (!selectedRun) return;
     setSaving(true);
     setError("");
@@ -265,7 +267,14 @@ export function SoftwareDevelopmentFactoryModule({
       const response = await fetch(`/api/sdf/runs/${selectedRun.id}/dispatch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, dryRun: mode !== "live", reviewOnly: mode !== "live", intent: mode === "live" ? "live" : "preview", jobId: latestQueueJob?.id }),
+        body: JSON.stringify({
+          mode,
+          dryRun: mode !== "live",
+          reviewOnly: mode !== "live",
+          intent: mode === "live" ? "live" : mode === "review-dispatch" || mode === "operator-handoff" ? mode : "preview",
+          approvalIntent: mode === "review-dispatch" || mode === "operator-handoff" ? "rex-approved-review-dispatch" : undefined,
+          jobId: latestQueueJob?.id,
+        }),
       });
       const payload = (await response.json()) as { run?: FactoryRun; dispatch?: DispatchAttempt; error?: string };
       if (!response.ok && !payload.run) throw new Error(payload.error ?? `Dispatch preview failed with ${response.status}`);
@@ -290,14 +299,14 @@ export function SoftwareDevelopmentFactoryModule({
       <div className="primary-column">
         <article className="panel-card accent-card sdf-intro-panel">
           <SectionHeader
-            detail="Phase 6 adds a backend-only dispatcher foundation: read-only GitHub sync, idempotent launch queueing, central approval policy, dry-run dispatch plans, adapter readiness checks, and audit-visible blockers."
-            eyebrow="Phase 6 · Dispatcher review foundation"
-            title="Preview approved work safely before live dispatch exists."
+            detail="Phase 7 introduces the first controlled live-dispatch path: approved SDF queue jobs can be prepared as Thor/helper review-mode operator handoffs. The web app still performs no GitHub writes, notifications, production writes, or direct agent spawning."
+            eyebrow="Phase 7 · Controlled review dispatch"
+            title="Prepare approved Thor/helper handoffs without unsafe side effects."
           />
           <div className="sdf-model-grid">
-            <div><span>1</span><h3>Read-only live sync</h3><p>Server-only GitHub adapter reads PR and check-run status when env is configured; otherwise manual/simulated fallback records blockers.</p></div>
-            <div><span>2</span><h3>Idempotent queue</h3><p>Launch jobs are keyed by run, packet, approval state, and blocker acknowledgement so repeated requests return existing work.</p></div>
-            <div><span>3</span><h3>Dry-run dispatcher</h3><p>Approved queue jobs generate review plans, capability checks, blocker reasons, and audit events without spawning agents, mutating GitHub, or sending messages.</p></div>
+            <div><span>1</span><h3>Read-only sync</h3><p>Server-only GitHub adapter reads PR and check-run status when env is configured; otherwise manual/simulated fallback records blockers.</p></div>
+            <div><span>2</span><h3>Idempotent queue</h3><p>Launch jobs and handoff packets are keyed by run, packet, approval state, and job so repeated review dispatch returns existing work.</p></div>
+            <div><span>3</span><h3>Review dispatch only</h3><p>Approved jobs prepare a Thor/helper review packet and exact operator next action; GitHub writes, messages, and web-app agent spawning stay blocked.</p></div>
           </div>
           <IntegrationNotice adapter={adapter} error={error} />
         </article>
@@ -368,25 +377,26 @@ export function SoftwareDevelopmentFactoryModule({
 
         {selectedRun ? (
           <article className="panel-card">
-            <SectionHeader detail="Prepare this packet for Thor/helper work. Phase 6 records an idempotent queue job, policy decision, and dry-run dispatch preview; it still never starts live external agents from the UI." eyebrow="Gated launch workflow" title="Prepared Thor/helper launch request" />
-            <div className="sdf-packet-toolbar"><button className="primary-action" onClick={copyPacket} type="button">{copied ? "Copied" : "Copy task packet"}</button><button disabled={saving} onClick={() => prepareLaunchRequest()} type="button">Queue launch job</button><button disabled={saving} onClick={() => prepareLaunchRequest("approved")} type="button">Record Rex approval + queue</button><button disabled={saving || !latestQueueJob} onClick={() => previewDispatch("dry-run")} type="button">Preview dry-run dispatch</button><button disabled={saving || !latestQueueJob} onClick={() => previewDispatch("live")} type="button">Test live blocker</button><span>Real dispatch remains blocked until Phase 7 connects approved least-privilege adapters.</span></div>
+            <SectionHeader detail="Prepare this packet for Thor/helper work. Phase 7 records an approved launch queue job, then prepares a review-mode operator handoff only after explicit Rex approval intent." eyebrow="Gated launch workflow" title="Thor/helper review-mode launch request" />
+            <div className="sdf-packet-toolbar"><button className="primary-action" onClick={copyPacket} type="button">{copied ? "Copied" : "Copy task packet"}</button><button disabled={saving} onClick={() => prepareLaunchRequest()} type="button">Queue launch job</button><button disabled={saving} onClick={() => prepareLaunchRequest("approved")} type="button">Record Rex approval + queue</button><button disabled={saving || !latestQueueJob} onClick={() => previewDispatch("dry-run")} type="button">Preview dry-run plan</button><button disabled={saving || !latestQueueJob} onClick={() => previewDispatch("review-dispatch")} type="button">Prepare review handoff</button><button disabled={saving || !latestQueueJob} onClick={() => previewDispatch("live")} type="button">Test live blocker</button><span>Only Thor/helper review-mode handoff is enabled; GitHub writes, notifications, and direct agent spawning remain blocked.</span></div>
             {latestLaunch ? <div className="sdf-pr-grid"><div><span>Approval state</span><strong>{latestLaunch.approvalState}</strong></div><div><span>Policy state</span><strong>{selectedRun.approvalPolicy.state}</strong></div><div><span>Launch ready</span><strong>{latestLaunch.launchReady ? "Yes" : "No"}</strong></div><div><span>Prepared</span><strong>{formatDate(latestLaunch.createdAt)}</strong></div><div><span>Next action</span><strong>{latestLaunch.nextAction}</strong></div></div> : <p>No launch request has been prepared for this run yet.</p>}
-            {latestQueueJob ? <div className="sdf-task-body-grid"><div><h4>Latest queue job</h4><div className="sdf-pr-grid"><div><span>State</span><strong>{latestQueueJob.state}</strong></div><div><span>Idempotency key</span><strong>{latestQueueJob.idempotencyKey}</strong></div><div><span>Packet hash</span><strong>{latestQueueJob.packetHash}</strong></div><div><span>Dispatch adapter</span><strong>{latestQueueJob.dispatchAdapter}</strong></div></div></div><div><h4>Why blocked or ready</h4><ul className="detail-list compact-list">{(latestQueueJob.blockedReasons.length ? latestQueueJob.blockedReasons : [latestQueueJob.auditNote]).map((item) => <li key={item}>{item}</li>)}</ul></div></div> : null}
+            {latestQueueJob ? <div className="sdf-task-body-grid"><div><h4>Latest queue job</h4><div className="sdf-pr-grid"><div><span>State</span><strong>{latestQueueJob.state}</strong></div><div><span>Idempotency key</span><strong>{latestQueueJob.idempotencyKey}</strong></div><div><span>Packet hash</span><strong>{latestQueueJob.packetHash}</strong></div><div><span>Dispatch adapter</span><strong>{latestQueueJob.dispatchAdapter}</strong></div><div><span>Review dispatch</span><strong>{latestHandoff ? latestHandoff.state : "Not prepared"}</strong></div></div></div><div><h4>Why blocked or ready</h4><ul className="detail-list compact-list">{(latestQueueJob.blockedReasons.length ? latestQueueJob.blockedReasons : [latestQueueJob.auditNote]).map((item) => <li key={item}>{item}</li>)}</ul></div></div> : null}
+            {latestHandoff ? <div className="sdf-task-body-grid"><div><h4>Prepared handoff packet</h4><div className="sdf-pr-grid"><div><span>Handoff state</span><strong>{latestHandoff.state}</strong></div><div><span>Handoff key</span><strong>{latestHandoff.idempotencyKey}</strong></div><div><span>Adapter</span><strong>{latestHandoff.adapter}</strong></div><div><span>Review only</span><strong>{latestHandoff.reviewModeOnly ? "Yes" : "No"}</strong></div><div><span>External execution</span><strong>{latestHandoff.externalExecution ? "Yes" : "No"}</strong></div></div></div><div><h4>Exact operator next action</h4><p>{latestHandoff.operatorNextAction}</p><ul className="detail-list compact-list">{(latestHandoff.blockerReasons.length ? latestHandoff.blockerReasons : ["Waiting for StarLord/Thor operator to run the packet in a separate review-mode agent session."]).map((item) => <li key={item}>{item}</li>)}</ul></div></div> : null}
             <pre className="sdf-task-packet">{taskPacket}</pre>
           </article>
         ) : null}
 
         {selectedRun ? (
           <article className="panel-card">
-            <SectionHeader detail="The dispatcher records what would happen next, the adapter capabilities involved, and exactly why live side effects remain blocked." eyebrow="Phase 6 dispatcher" title="Dry-run dispatch plan and adapter readiness" />
+            <SectionHeader detail="The dispatcher records the approved review-mode handoff packet, adapter capability checks, idempotency, blockers, and the exact operator next action. Live side effects remain blocked." eyebrow="Phase 7 dispatcher" title="Review dispatch handoff and adapter readiness" />
             <div className="sdf-pr-grid">
               <div><span>Dispatcher status</span><strong>{dispatcher?.status ?? "review-only"}</strong></div>
-              <div><span>Default mode</span><strong>{dispatcher?.defaultMode ?? "dry-run"}</strong></div>
+              <div><span>Default mode</span><strong>{dispatcher?.defaultMode ?? "review-dispatch"}</strong></div>
               <div><span>Live execution</span><strong>{dispatcher?.liveExecutionEnabled ? "Enabled" : "Blocked"}</strong></div>
-              <div><span>Latest result</span><strong>{(latestDispatch ?? latestRecordedDispatch)?.outcome ?? "No dispatch preview yet"}</strong></div>
+              <div><span>Latest result</span><strong>{activeDispatch?.outcome ?? "No dispatch preview yet"}</strong></div>
             </div>
-            <p>{dispatcher?.summary ?? "Dispatcher readiness is loading; default behavior is dry-run/review only."}</p>
-            {(latestDispatch ?? latestRecordedDispatch) ? <div className="sdf-task-body-grid"><div><h4>Dispatch plan</h4><p>{(latestDispatch ?? latestRecordedDispatch)?.plan.summary}</p><ul className="detail-list compact-list">{((latestDispatch ?? latestRecordedDispatch)?.plan.steps ?? []).map((step) => <li key={step.id}>{step.action} — {step.detail}</li>)}</ul></div><div><h4>Blocker reasons</h4><ul className="detail-list compact-list">{((latestDispatch ?? latestRecordedDispatch)?.plan.blockerReasons.length ? (latestDispatch ?? latestRecordedDispatch)?.plan.blockerReasons : ["Dry-run preview is approved; live execution is still disabled by adapter policy."])?.map((item) => <li key={item}>{item}</li>)}</ul></div></div> : <p>No dispatch preview has been recorded. Queue an approved launch job, then preview dry-run dispatch.</p>}
+            <p>{dispatcher?.summary ?? "Dispatcher readiness is loading; default behavior is review-mode handoff only."}</p>
+            {activeDispatch ? <div className="sdf-task-body-grid"><div><h4>Dispatch plan</h4><p>{activeDispatch.plan.summary}</p><ul className="detail-list compact-list">{(activeDispatch.plan.steps ?? []).map((step) => <li key={step.id}>{step.action} — {step.detail}</li>)}</ul></div><div><h4>Blocker reasons</h4><ul className="detail-list compact-list">{(activeDispatch.plan.blockerReasons.length ? activeDispatch.plan.blockerReasons : ["Review handoff is approved/prepared; live GitHub writes, notifications, and web-app agent spawning are still disabled."])?.map((item) => <li key={item}>{item}</li>)}</ul></div></div> : <p>No dispatch preview has been recorded. Queue an approved launch job, then prepare a review handoff.</p>}
             <div className="sdf-generated-graph">
               {(dispatcher?.adapters ?? []).map((capability) => (
                 <div className="sdf-generated-task" key={capability.kind}>
@@ -451,7 +461,7 @@ export function SoftwareDevelopmentFactoryModule({
         <article className="panel-card control-panel"><SectionHeader detail="Every factory run should show what evidence exists before it asks Rex to trust the output." eyebrow="Quality gates" title="Checkpoint standards" /><div className="control-grid">{gates.map((gate) => <div className="control-card" key={gate.id}><div className="control-card-head"><h3>{gate.label}</h3><span className={`status-pill ${statusTone(gate.status)}`}>{gate.status}</span></div><p>{gate.evidence}</p></div>)}</div></article>
         <article className="panel-card"><SectionHeader detail="The seeded SDF foundation remains visible so Rex can see how Phase 4 maps onto the factory model." eyebrow="Foundation pipeline" title="Factory stages already defined" /><div className="sdf-pipeline-rail">{pipeline.map((stage, index) => <div className="pipeline-step" key={stage.id}><span className="pipeline-index">{index + 1}</span><div><div className="pipeline-headline"><h3>{stage.label}</h3><span className={`status-pill ${statusTone(stage.status)}`}>{stage.status}</span></div><p>{stage.detail}</p><div className="thread-meta">Owner: {stage.owner}</div></div></div>)}</div></article>
         <article className="panel-card"><SectionHeader detail="Seeded outputs keep the older SDF concept visible while Phase 4 adds server-backed operations." eyebrow="Seeded outputs" title="Existing phase tasks and Rex input queue" /><div className="sdf-task-list compact-sdf-list">{tasks.map((task) => <div className="ops-task-card" key={task.id}><div className="ops-task-topline"><div><p className="project-priority">{task.phase} · {task.owner}</p><h3>{task.title}</h3></div><span className={`status-pill ${statusTone(task.status)}`}>{task.status}</span></div></div>)}</div><div className="dispatch-list sdf-rex-input-list">{rexInputs.map((item) => <div className="dispatch-card" key={item.id}><p className="project-priority">{item.priority} · {item.neededFor}</p><h3>{item.title}</h3><p>{item.prompt}</p></div>)}</div></article>
-        <article className="panel-card sdf-readiness-card"><p className="eyebrow">Phase 6 dispatch path</p><h2>Real GitHub writes and agent dispatch stay blocked until a safe backend adapter is explicitly connected.</h2><p>Phase 5 creates the live-read boundary, idempotent launch queue, approval policy, audit evidence, and blocker copy Rex needs before trusting automated execution.</p></article>
+        <article className="panel-card sdf-readiness-card"><p className="eyebrow">Phase 7 dispatch path</p><h2>Only Thor/helper review-mode handoff is enabled.</h2><p>Mission Control can prepare an auditable operator packet after Rex approval. GitHub writes, notifications, production writes, and direct agent spawning stay blocked until a later phase.</p></article>
       </div>
     </section>
   );
