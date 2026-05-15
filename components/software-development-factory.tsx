@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { appTypeTemplates, buildReadiness, buildTaskPacket, defaultIntake, generateTaskGraph } from "@/lib/sdf/factory";
-import type { BuildIntake, DispatchAttempt, FactoryModeName, FactoryRun, FactoryRunState, SdfRunRegistryResponse } from "@/lib/sdf/types";
+import type { BuildIntake, DispatchAttempt, FactoryModeName, FactoryRun, FactoryRunState, OperatorBridgeAction, OperatorBridgeOutboxItem, SdfRunRegistryResponse } from "@/lib/sdf/types";
 import type {
   SdfAgentLane,
   SdfFactoryMode,
@@ -57,7 +57,7 @@ function buildReviewCheckpoints(intake: BuildIntake, tasks: ReturnType<typeof ge
     {
       label: "Execution safety",
       state: "Review",
-      detail: "The web app prepares and records launch packets only. Phase 7 can prepare a Thor/helper review-mode operator handoff, but it still does not spawn agents itself.",
+      detail: "The web app prepares and records launch packets only. Phase 8 can prepare an OpenClaw/operator outbox packet, but it still does not spawn agents itself.",
     },
     {
       label: "Blocked",
@@ -67,7 +67,7 @@ function buildReviewCheckpoints(intake: BuildIntake, tasks: ReturnType<typeof ge
     {
       label: "Approval/review",
       state: intake.mode === "Autopilot" ? "Review" : "Ready",
-      detail: "Rex approval is logged before review dispatch. GitHub writes, notifications, and live helper-agent spawning remain out of scope.",
+      detail: "Rex approval is logged before bridge preparation. GitHub writes, notifications, production writes, and live helper-agent spawning remain out of scope.",
     },
   ];
 }
@@ -102,7 +102,7 @@ function FieldGroup({
 function IntegrationNotice({ adapter, error }: { adapter: SdfRunRegistryResponse["adapter"] | null; error: string }) {
   return (
     <div className="sdf-notice" role="note">
-      <strong>Phase 7 controlled review dispatch:</strong> SDF now reads and writes runs through typed API routes backed by a safe server file adapter ({adapter?.source ?? "loading"}), can attempt read-only GitHub PR/check sync, queues launch jobs idempotently behind approval policy, and prepares only Thor/helper review-mode operator handoffs. {error ? `Current API issue: ${error}` : "GitHub writes, notifications, production writes, and web-app agent spawning remain disabled."}
+      <strong>Phase 8 OpenClaw/operator bridge:</strong> SDF reads and writes runs through typed API routes backed by a safe server file adapter ({adapter?.source ?? "loading"}), queues launch jobs idempotently behind approval policy, and now prepares only review-mode OpenClaw/operator outbox packets for StarLord/Thor. {error ? `Current API issue: ${error}` : "GitHub writes, notifications, production writes, shell commands, and web-app agent spawning remain disabled."}
     </div>
   );
 }
@@ -132,6 +132,7 @@ export function SoftwareDevelopmentFactoryModule({
   const [adapter, setAdapter] = useState<SdfRunRegistryResponse["adapter"] | null>(null);
   const [dispatcher, setDispatcher] = useState<SdfRunRegistryResponse["dispatcher"] | null>(null);
   const [latestDispatch, setLatestDispatch] = useState<DispatchAttempt | null>(null);
+  const [latestBridgeItem, setLatestBridgeItem] = useState<OperatorBridgeOutboxItem | null>(null);
 
   async function loadRuns() {
     setLoading(true);
@@ -172,6 +173,7 @@ export function SoftwareDevelopmentFactoryModule({
   const latestRecordedDispatch = selectedRun?.dispatchAttempts?.[0];
   const activeDispatch = latestDispatch ?? latestRecordedDispatch;
   const latestHandoff = latestQueueJob?.reviewHandoff ?? activeDispatch?.reviewHandoff;
+  const activeBridgeItem = latestBridgeItem ?? selectedRun?.operatorBridgeOutbox?.[0] ?? null;
 
   function updateIntake(field: keyof BuildIntake, value: string) {
     setIntake((current) => ({ ...current, [field]: value }));
@@ -247,7 +249,7 @@ export function SoftwareDevelopmentFactoryModule({
       const response = await fetch(`/api/sdf/runs/${selectedRun.id}/launch-requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approvalState, approvalNote: approvalState === "approved" ? "Rex approval recorded for Phase 7 review-mode Thor/helper handoff only; no web-app agent spawn is allowed." : undefined }),
+        body: JSON.stringify({ approvalState, approvalNote: approvalState === "approved" ? "Rex approval recorded for Phase 8 review-mode OpenClaw/operator handoff only; no web-app agent spawn is allowed." : undefined }),
       });
       if (!response.ok) throw new Error(`Launch request failed with ${response.status}`);
       const updated = (await response.json()) as FactoryRun;
@@ -287,6 +289,38 @@ export function SoftwareDevelopmentFactoryModule({
     }
   }
 
+  async function updateOperatorBridge(action: OperatorBridgeAction, options: { operator?: string; note?: string; blockedReason?: string } = {}) {
+    if (!selectedRun) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/sdf/runs/${selectedRun.id}/operator-bridge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          approvalIntent: action === "prepare" ? "rex-approved-review-dispatch" : undefined,
+          reviewOnly: true,
+          jobId: latestQueueJob?.id,
+          bridgeItemId: activeBridgeItem?.id,
+          actor: "System",
+          operator: options.operator ?? "StarLord/Thor operator",
+          note: options.note,
+          blockedReason: options.blockedReason,
+          approvalNote: "Rex approval recorded for Phase 8 review-mode OpenClaw/operator bridge only; no web-app direct execution is allowed.",
+        }),
+      });
+      const payload = (await response.json()) as { run?: FactoryRun; item?: OperatorBridgeOutboxItem; error?: string };
+      if (!response.ok && !payload.run) throw new Error(payload.error ?? `Operator bridge update failed with ${response.status}`);
+      if (payload.run) setRuns((current) => current.map((run) => (run.id === payload.run?.id ? payload.run : run)));
+      if (payload.item) setLatestBridgeItem(payload.item);
+    } catch (apiError) {
+      setError(apiError instanceof Error ? apiError.message : "Unable to update OpenClaw/operator bridge");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function copyPacket() {
     if (!taskPacket || typeof navigator === "undefined") return;
     await navigator.clipboard.writeText(taskPacket);
@@ -299,14 +333,14 @@ export function SoftwareDevelopmentFactoryModule({
       <div className="primary-column">
         <article className="panel-card accent-card sdf-intro-panel">
           <SectionHeader
-            detail="Phase 7 introduces the first controlled live-dispatch path: approved SDF queue jobs can be prepared as Thor/helper review-mode operator handoffs. The web app still performs no GitHub writes, notifications, production writes, or direct agent spawning."
-            eyebrow="Phase 7 · Controlled review dispatch"
-            title="Prepare approved Thor/helper handoffs without unsafe side effects."
+            detail="Phase 8 wires the safe OpenClaw/operator bridge foundation: approved SDF queue jobs become review-mode outbox packets that StarLord/Thor can claim outside the web app. The app still performs no GitHub writes, notifications, production writes, shell commands, or direct agent spawning."
+            eyebrow="Phase 8 · OpenClaw/operator bridge"
+            title="Prepare approved review-mode operator packets without unsafe side effects."
           />
           <div className="sdf-model-grid">
             <div><span>1</span><h3>Read-only sync</h3><p>Server-only GitHub adapter reads PR and check-run status when env is configured; otherwise manual/simulated fallback records blockers.</p></div>
-            <div><span>2</span><h3>Idempotent queue</h3><p>Launch jobs and handoff packets are keyed by run, packet, approval state, and job so repeated review dispatch returns existing work.</p></div>
-            <div><span>3</span><h3>Review dispatch only</h3><p>Approved jobs prepare a Thor/helper review packet and exact operator next action; GitHub writes, messages, and web-app agent spawning stay blocked.</p></div>
+            <div><span>2</span><h3>Idempotent bridge outbox</h3><p>Launch jobs and operator packets are keyed by run, packet, approval state, and job so repeated prepare returns existing work.</p></div>
+            <div><span>3</span><h3>Review-mode only</h3><p>Approved jobs prepare a structured OpenClaw/StarLord/Thor packet and exact lifecycle state; GitHub writes, messages, shell commands, and web-app agent spawning stay blocked.</p></div>
           </div>
           <IntegrationNotice adapter={adapter} error={error} />
         </article>
@@ -377,18 +411,20 @@ export function SoftwareDevelopmentFactoryModule({
 
         {selectedRun ? (
           <article className="panel-card">
-            <SectionHeader detail="Prepare this packet for Thor/helper work. Phase 7 records an approved launch queue job, then prepares a review-mode operator handoff only after explicit Rex approval intent." eyebrow="Gated launch workflow" title="Thor/helper review-mode launch request" />
-            <div className="sdf-packet-toolbar"><button className="primary-action" onClick={copyPacket} type="button">{copied ? "Copied" : "Copy task packet"}</button><button disabled={saving} onClick={() => prepareLaunchRequest()} type="button">Queue launch job</button><button disabled={saving} onClick={() => prepareLaunchRequest("approved")} type="button">Record Rex approval + queue</button><button disabled={saving || !latestQueueJob} onClick={() => previewDispatch("dry-run")} type="button">Preview dry-run plan</button><button disabled={saving || !latestQueueJob} onClick={() => previewDispatch("review-dispatch")} type="button">Prepare review handoff</button><button disabled={saving || !latestQueueJob} onClick={() => previewDispatch("live")} type="button">Test live blocker</button><span>Only Thor/helper review-mode handoff is enabled; GitHub writes, notifications, and direct agent spawning remain blocked.</span></div>
+            <SectionHeader detail="Prepare this packet for Thor/helper work. Phase 8 records an approved launch queue job, then prepares a review-mode OpenClaw/operator outbox item only after explicit Rex approval intent." eyebrow="Gated launch workflow" title="OpenClaw/operator review-mode launch request" />
+            <div className="sdf-packet-toolbar"><button className="primary-action" onClick={copyPacket} type="button">{copied ? "Copied" : "Copy task packet"}</button><button disabled={saving} onClick={() => prepareLaunchRequest()} type="button">Queue launch job</button><button disabled={saving} onClick={() => prepareLaunchRequest("approved")} type="button">Record Rex approval + queue</button><button disabled={saving || !latestQueueJob} onClick={() => previewDispatch("dry-run")} type="button">Preview dry-run plan</button><button disabled={saving || !latestQueueJob} onClick={() => previewDispatch("review-dispatch")} type="button">Prepare review handoff</button><button disabled={saving || !latestQueueJob} onClick={() => updateOperatorBridge("prepare")} type="button">Prepare OpenClaw bridge</button><button disabled={saving || !latestQueueJob} onClick={() => previewDispatch("live")} type="button">Test live blocker</button><span>Only review-mode operator outbox is enabled; GitHub writes, notifications, production writes, shell commands, and direct agent spawning remain blocked.</span></div>
             {latestLaunch ? <div className="sdf-pr-grid"><div><span>Approval state</span><strong>{latestLaunch.approvalState}</strong></div><div><span>Policy state</span><strong>{selectedRun.approvalPolicy.state}</strong></div><div><span>Launch ready</span><strong>{latestLaunch.launchReady ? "Yes" : "No"}</strong></div><div><span>Prepared</span><strong>{formatDate(latestLaunch.createdAt)}</strong></div><div><span>Next action</span><strong>{latestLaunch.nextAction}</strong></div></div> : <p>No launch request has been prepared for this run yet.</p>}
             {latestQueueJob ? <div className="sdf-task-body-grid"><div><h4>Latest queue job</h4><div className="sdf-pr-grid"><div><span>State</span><strong>{latestQueueJob.state}</strong></div><div><span>Idempotency key</span><strong>{latestQueueJob.idempotencyKey}</strong></div><div><span>Packet hash</span><strong>{latestQueueJob.packetHash}</strong></div><div><span>Dispatch adapter</span><strong>{latestQueueJob.dispatchAdapter}</strong></div><div><span>Review dispatch</span><strong>{latestHandoff ? latestHandoff.state : "Not prepared"}</strong></div></div></div><div><h4>Why blocked or ready</h4><ul className="detail-list compact-list">{(latestQueueJob.blockedReasons.length ? latestQueueJob.blockedReasons : [latestQueueJob.auditNote]).map((item) => <li key={item}>{item}</li>)}</ul></div></div> : null}
             {latestHandoff ? <div className="sdf-task-body-grid"><div><h4>Prepared handoff packet</h4><div className="sdf-pr-grid"><div><span>Handoff state</span><strong>{latestHandoff.state}</strong></div><div><span>Handoff key</span><strong>{latestHandoff.idempotencyKey}</strong></div><div><span>Adapter</span><strong>{latestHandoff.adapter}</strong></div><div><span>Review only</span><strong>{latestHandoff.reviewModeOnly ? "Yes" : "No"}</strong></div><div><span>External execution</span><strong>{latestHandoff.externalExecution ? "Yes" : "No"}</strong></div></div></div><div><h4>Exact operator next action</h4><p>{latestHandoff.operatorNextAction}</p><ul className="detail-list compact-list">{(latestHandoff.blockerReasons.length ? latestHandoff.blockerReasons : ["Waiting for StarLord/Thor operator to run the packet in a separate review-mode agent session."]).map((item) => <li key={item}>{item}</li>)}</ul></div></div> : null}
+            {activeBridgeItem ? <div className="sdf-task-body-grid"><div><h4>OpenClaw/operator bridge outbox</h4><div className="sdf-pr-grid"><div><span>State</span><strong>{activeBridgeItem.state}</strong></div><div><span>Handoff id</span><strong>{activeBridgeItem.handoffId}</strong></div><div><span>Run id</span><strong>{activeBridgeItem.runId}</strong></div><div><span>Queue job id</span><strong>{activeBridgeItem.queueJobId}</strong></div><div><span>Actor/operator</span><strong>{activeBridgeItem.operator ?? activeBridgeItem.actor}</strong></div><div><span>Review only</span><strong>{activeBridgeItem.reviewModeOnly ? "Yes" : "No"}</strong></div><div><span>External execution</span><strong>{activeBridgeItem.externalExecution ? "Yes" : "No"}</strong></div><div><span>Updated</span><strong>{formatDate(activeBridgeItem.updatedAt)}</strong></div></div></div><div><h4>Operator lifecycle controls</h4><div className="sdf-packet-toolbar"><button disabled={saving} onClick={() => updateOperatorBridge("claim", { note: "StarLord/Thor operator claimed the review-mode bridge packet." })} type="button">Claim</button><button disabled={saving} onClick={() => updateOperatorBridge("start-review", { note: "StarLord/Thor operator marked review-running." })} type="button">Mark review running</button><button disabled={saving} onClick={() => updateOperatorBridge("complete-review", { note: "Review-mode operator work completed; record branch, commit, PR, verification, and blockers separately." })} type="button">Complete review</button><button disabled={saving} onClick={() => updateOperatorBridge("block", { blockedReason: "Operator marked this bridge blocked pending Rex/Thor follow-up." })} type="button">Block</button><button disabled={saving} onClick={() => updateOperatorBridge("cancel", { note: "Operator bridge cancelled without external side effects." })} type="button">Cancel</button><button disabled={saving} onClick={() => updateOperatorBridge("fail", { note: "Operator bridge failed safely without external side effects." })} type="button">Fail</button></div><p>Packet type: {activeBridgeItem.executionPacket.packetType} · schema {activeBridgeItem.executionPacket.schemaVersion}</p><ul className="detail-list compact-list">{(activeBridgeItem.blockedReasons.length ? activeBridgeItem.blockedReasons : activeBridgeItem.notes).map((item) => <li key={item}>{item}</li>)}</ul></div></div> : <div className="sdf-notice" role="note"><strong>Bridge not prepared yet:</strong> record Rex approval, keep reviewOnly=true, then prepare the OpenClaw bridge. Repeated prepare returns the same idempotent outbox item.</div>}
+            {activeBridgeItem ? <pre className="sdf-task-packet">{JSON.stringify(activeBridgeItem.executionPacket, null, 2)}</pre> : null}
             <pre className="sdf-task-packet">{taskPacket}</pre>
           </article>
         ) : null}
 
         {selectedRun ? (
           <article className="panel-card">
-            <SectionHeader detail="The dispatcher records the approved review-mode handoff packet, adapter capability checks, idempotency, blockers, and the exact operator next action. Live side effects remain blocked." eyebrow="Phase 7 dispatcher" title="Review dispatch handoff and adapter readiness" />
+            <SectionHeader detail="The dispatcher records the approved review-mode handoff packet, adapter capability checks, idempotency, blockers, and the exact operator next action. Phase 8 adds the OpenClaw/operator outbox lifecycle while live side effects remain blocked." eyebrow="Phase 8 dispatcher + bridge" title="Review dispatch handoff and adapter readiness" />
             <div className="sdf-pr-grid">
               <div><span>Dispatcher status</span><strong>{dispatcher?.status ?? "review-only"}</strong></div>
               <div><span>Default mode</span><strong>{dispatcher?.defaultMode ?? "review-dispatch"}</strong></div>
@@ -461,7 +497,7 @@ export function SoftwareDevelopmentFactoryModule({
         <article className="panel-card control-panel"><SectionHeader detail="Every factory run should show what evidence exists before it asks Rex to trust the output." eyebrow="Quality gates" title="Checkpoint standards" /><div className="control-grid">{gates.map((gate) => <div className="control-card" key={gate.id}><div className="control-card-head"><h3>{gate.label}</h3><span className={`status-pill ${statusTone(gate.status)}`}>{gate.status}</span></div><p>{gate.evidence}</p></div>)}</div></article>
         <article className="panel-card"><SectionHeader detail="The seeded SDF foundation remains visible so Rex can see how Phase 4 maps onto the factory model." eyebrow="Foundation pipeline" title="Factory stages already defined" /><div className="sdf-pipeline-rail">{pipeline.map((stage, index) => <div className="pipeline-step" key={stage.id}><span className="pipeline-index">{index + 1}</span><div><div className="pipeline-headline"><h3>{stage.label}</h3><span className={`status-pill ${statusTone(stage.status)}`}>{stage.status}</span></div><p>{stage.detail}</p><div className="thread-meta">Owner: {stage.owner}</div></div></div>)}</div></article>
         <article className="panel-card"><SectionHeader detail="Seeded outputs keep the older SDF concept visible while Phase 4 adds server-backed operations." eyebrow="Seeded outputs" title="Existing phase tasks and Rex input queue" /><div className="sdf-task-list compact-sdf-list">{tasks.map((task) => <div className="ops-task-card" key={task.id}><div className="ops-task-topline"><div><p className="project-priority">{task.phase} · {task.owner}</p><h3>{task.title}</h3></div><span className={`status-pill ${statusTone(task.status)}`}>{task.status}</span></div></div>)}</div><div className="dispatch-list sdf-rex-input-list">{rexInputs.map((item) => <div className="dispatch-card" key={item.id}><p className="project-priority">{item.priority} · {item.neededFor}</p><h3>{item.title}</h3><p>{item.prompt}</p></div>)}</div></article>
-        <article className="panel-card sdf-readiness-card"><p className="eyebrow">Phase 7 dispatch path</p><h2>Only Thor/helper review-mode handoff is enabled.</h2><p>Mission Control can prepare an auditable operator packet after Rex approval. GitHub writes, notifications, production writes, and direct agent spawning stay blocked until a later phase.</p></article>
+        <article className="panel-card sdf-readiness-card"><p className="eyebrow">Phase 8 bridge path</p><h2>Only OpenClaw/operator review-mode outbox is enabled.</h2><p>Mission Control can prepare, claim, run, complete, block, cancel, or fail an auditable operator packet after Rex approval. GitHub writes, notifications, production writes, shell commands, and direct agent spawning stay blocked until a later phase.</p></article>
       </div>
     </section>
   );

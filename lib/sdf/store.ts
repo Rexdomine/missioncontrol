@@ -5,7 +5,8 @@ import { appendAudit, buildReadiness, buildTaskPacket, buildTimeline, createLaun
 import { chooseLaunchQueueState, deriveLaunchIdempotencyKey, evaluateApprovalPolicy, stableHash } from "./approval-policy";
 import { buildDispatchPlan, createDispatchAttempt, createThorReviewHandoff, findDispatchableJob, getDispatcherReadiness } from "./dispatcher";
 import { getGitHubLiveReadiness, readGitHubCheckpoint } from "./github";
-import type { BuildIntake, DispatchAttempt, DispatchMode, FactoryRun, FactoryRunState, LaunchApprovalState, LaunchQueueJob, SdfRunRegistryResponse } from "./types";
+import { buildOperatorBridgeOutboxItem, transitionOperatorBridgeItem } from "./operator-bridge";
+import type { BuildIntake, DispatchAttempt, DispatchMode, FactoryRun, FactoryRunState, LaunchApprovalState, LaunchQueueJob, OperatorBridgeAction, OperatorBridgeOutboxItem, SdfRunRegistryResponse } from "./types";
 
 const dataDir = process.env.SDF_DATA_DIR || path.join(process.cwd(), ".mission-control-data", "sdf");
 const dataFile = path.join(dataDir, "runs.json");
@@ -25,6 +26,7 @@ const intakeSchema = z.object({
 const stateSchema = z.enum(["Draft", "Ready to launch", "Running", "Blocked", "Review ready", "PR open", "Done"]);
 const approvalSchema = z.enum(["draft", "requested", "approved", "rejected", "launched"]);
 const dispatchModeSchema = z.enum(["dry-run", "review", "review-dispatch", "operator-handoff", "live"]);
+const operatorBridgeActionSchema = z.enum(["prepare", "claim", "start-review", "complete-review", "block", "cancel", "fail"]);
 
 async function ensureStore() {
   await fs.mkdir(dataDir, { recursive: true });
@@ -42,6 +44,7 @@ function normalizeRun(run: FactoryRun): FactoryRun {
     launchQueue: run.launchQueue ?? [],
     approvalPolicy: run.approvalPolicy ?? defaultApprovalPolicy,
     dispatchAttempts: run.dispatchAttempts ?? [],
+    operatorBridgeOutbox: run.operatorBridgeOutbox ?? [],
     auditTrail: run.auditTrail ?? [],
     prCheckpoint: {
       ...run.prCheckpoint,
@@ -243,7 +246,7 @@ export async function prepareLaunchRequest(id: string, body: unknown): Promise<F
       blockedReasons: policy.reasons,
       dispatchAdapter: policy.canPrepareReviewDispatch ? "safe-backend" : "none",
       auditNote: parsed.dispatchRequested
-        ? "Dispatch was requested; Phase 7 can prepare only a Thor/helper review-mode operator handoff. No direct agent spawn or external write occurred."
+        ? "Dispatch was requested; Phase 8 can prepare only a Thor/helper review-mode operator handoff. No direct agent spawn or external write occurred."
         : "Launch job queued/prepared only. No external agent, GitHub write, message, or production mutation was dispatched.",
     };
 
@@ -339,7 +342,7 @@ export async function dispatchLaunchJob(id: string, body: unknown): Promise<{ ru
           ...createThorReviewHandoff(checkedRun, job),
           idempotencyKey: `${previewPlan.idempotencyKey}-missing-intent`,
           state: "blocked",
-          blockerReasons: ["Request intent must include approvalIntent=rex-approved-review-dispatch for Phase 7 review-mode handoff."],
+          blockerReasons: ["Request intent must include approvalIntent=rex-approved-review-dispatch for Phase 8 review-mode handoff."],
           operatorNextAction: "Record explicit Rex approval intent in the dispatch request, then retry review-dispatch.",
         }),
         idempotencyKey: `${previewPlan.idempotencyKey}-missing-intent`,
@@ -357,7 +360,7 @@ export async function dispatchLaunchJob(id: string, body: unknown): Promise<{ ru
     const handoff = reviewDispatchRequested ? createThorReviewHandoff(checkedRun, job) : undefined;
     const attempt = createDispatchAttempt(checkedRun, job, requestedMode, parsed.requestedBy, handoff);
     const preparedJob: LaunchQueueJob = handoff && attempt.outcome === "prepared"
-      ? { ...job, state: "dispatched-ready", dispatchAdapter: "thor-helper-review", reviewHandoff: handoff, updatedAt: nowIso(), auditNote: "Phase 7 Thor/helper review-mode operator handoff prepared. Waiting for StarLord/Thor operator execution; no web-app external side effects occurred." }
+      ? { ...job, state: "dispatched-ready", dispatchAdapter: "thor-helper-review", reviewHandoff: handoff, updatedAt: nowIso(), auditNote: "Phase 8 OpenClaw/operator review-mode operator handoff prepared. Waiting for StarLord/Thor operator execution; no web-app external side effects occurred." }
       : job;
     const launchQueue = (checkedRun.launchQueue ?? []).map((item) => item.id === job.id ? preparedJob : item);
     const action = requestedMode === "live" || !explicitReviewIntent || attempt.outcome === "blocked" ? "dispatch.blocked" : reviewDispatchRequested ? "dispatch.review-prepared" : "dispatch.dry-run-approved";
@@ -365,7 +368,7 @@ export async function dispatchLaunchJob(id: string, body: unknown): Promise<{ ru
       ? "Thor/helper review-mode handoff prepared and marked waiting for operator; no external side effects occurred."
       : attempt.outcome === "planned"
         ? "Approved dry-run dispatch plan recorded; no external side effects occurred."
-        : "Dispatch was blocked by Phase 7 safety policy; no external side effects occurred.";
+        : "Dispatch was blocked by Phase 8 safety policy; no external side effects occurred.";
     const updated = appendAudit(
       normalizeRun({ ...checkedRun, launchQueue, dispatchAttempts: [attempt, ...(checkedRun.dispatchAttempts ?? [])], updatedAt: nowIso() }),
       {
@@ -389,4 +392,112 @@ export async function dispatchLaunchJob(id: string, body: unknown): Promise<{ ru
   await writeRuns(next);
   const finalResult = result as { run: FactoryRun; dispatch: DispatchAttempt };
   return { run: normalizeRun(finalResult.run), dispatch: finalResult.dispatch };
+}
+
+export async function updateOperatorBridgeOutbox(id: string, body: unknown): Promise<{ run: FactoryRun; item: OperatorBridgeOutboxItem; idempotent: boolean } | null> {
+  const parsed = z
+    .object({
+      action: operatorBridgeActionSchema.default("prepare"),
+      approvalIntent: z.enum(["rex-approved-review-dispatch"]).optional(),
+      reviewOnly: z.boolean().default(true),
+      jobId: z.string().optional(),
+      bridgeItemId: z.string().optional(),
+      handoffId: z.string().optional(),
+      actor: z.enum(["Rex", "Thor", "System"]).default("System"),
+      operator: z.string().optional(),
+      note: z.string().optional(),
+      blockedReason: z.string().optional(),
+      approvalNote: z.string().optional(),
+    })
+    .parse(body ?? {});
+
+  const runs = await readRunsUnsafe();
+  let result: { run: FactoryRun; item: OperatorBridgeOutboxItem; idempotent: boolean } | null = null;
+
+  const next = runs.map((run) => {
+    if (run.id !== id) return run;
+    const checkedRun = normalizeRun({ ...run, updatedAt: nowIso() });
+    const action = parsed.action as OperatorBridgeAction;
+
+    if (action === "prepare") {
+      const job = findDispatchableJob(checkedRun, parsed.jobId);
+      if (!job) {
+        throw new Error("No launch queue job exists. Queue an approved review-mode launch request before preparing the OpenClaw/operator bridge.");
+      }
+      if (parsed.approvalIntent !== "rex-approved-review-dispatch" || parsed.reviewOnly !== true) {
+        const blockedItem = buildOperatorBridgeOutboxItem(checkedRun, job, { actor: parsed.actor, approvalNote: parsed.approvalNote });
+        const item = {
+          ...blockedItem,
+          idempotencyKey: `${blockedItem.idempotencyKey}-missing-approval-intent`,
+          id: `${blockedItem.id}-missing-approval-intent`,
+          state: "blocked" as const,
+          blockedReasons: ["Prepare requires approvalIntent=rex-approved-review-dispatch and reviewOnly=true. Live/external execution remains blocked.", ...blockedItem.blockedReasons],
+          notes: ["OpenClaw/operator bridge preparation was blocked by missing explicit review-mode approval intent.", ...blockedItem.notes],
+        };
+        const updated = appendAudit(normalizeRun({ ...checkedRun, operatorBridgeOutbox: [item, ...(checkedRun.operatorBridgeOutbox ?? [])] }), {
+          action: "operator.bridge.blocked",
+          actor: "System",
+          summary: "OpenClaw/operator bridge preparation blocked because explicit review-mode Rex approval intent was missing.",
+          metadata: { jobId: job.id, reviewOnly: parsed.reviewOnly, approvalIntentPresent: Boolean(parsed.approvalIntent), externalSideEffectsAllowed: false },
+        });
+        result = { run: normalizeRun(updated), item, idempotent: false };
+        return result.run;
+      }
+
+      const item = buildOperatorBridgeOutboxItem(checkedRun, job, { actor: parsed.actor, approvalNote: parsed.approvalNote });
+      const existing = (checkedRun.operatorBridgeOutbox ?? []).find((bridgeItem) => bridgeItem.idempotencyKey === item.idempotencyKey);
+      if (existing) {
+        const updated = appendAudit(checkedRun, {
+          action: "operator.bridge.idempotent-hit",
+          actor: "System",
+          summary: `Existing OpenClaw/operator bridge outbox item returned for idempotency key ${existing.idempotencyKey}.`,
+          metadata: { bridgeItemId: existing.id, handoffId: existing.handoffId, state: existing.state, externalSideEffectsAllowed: false },
+        });
+        result = { run: normalizeRun(updated), item: existing, idempotent: true };
+        return result.run;
+      }
+
+      const updated = appendAudit(normalizeRun({ ...checkedRun, operatorBridgeOutbox: [item, ...(checkedRun.operatorBridgeOutbox ?? [])] }), {
+        action: item.state === "prepared" ? "operator.bridge.prepared" : "operator.bridge.blocked",
+        actor: "System",
+        summary: item.state === "prepared" ? "OpenClaw/operator bridge outbox item prepared for review-mode manual/operator execution." : "OpenClaw/operator bridge outbox item recorded as blocked by approval policy.",
+        metadata: { bridgeItemId: item.id, handoffId: item.handoffId, jobId: job.id, reviewModeOnly: true, externalSideEffectsAllowed: false },
+      });
+      result = { run: normalizeRun(updated), item, idempotent: false };
+      return result.run;
+    }
+
+    const item = (checkedRun.operatorBridgeOutbox ?? []).find((bridgeItem) => bridgeItem.id === parsed.bridgeItemId || bridgeItem.handoffId === parsed.handoffId) ?? checkedRun.operatorBridgeOutbox?.[0];
+    if (!item) {
+      throw new Error("No OpenClaw/operator bridge outbox item exists to update.");
+    }
+    const transitioned = transitionOperatorBridgeItem(item, {
+      action,
+      actor: parsed.actor,
+      operator: parsed.operator,
+      note: parsed.note,
+      blockedReason: parsed.blockedReason,
+    });
+    const operatorBridgeOutbox = (checkedRun.operatorBridgeOutbox ?? []).map((bridgeItem) => bridgeItem.id === item.id ? transitioned : bridgeItem);
+    const actionMap: Record<Exclude<OperatorBridgeAction, "prepare">, NonNullable<FactoryRun["auditTrail"]>[number]["action"]> = {
+      claim: "operator.bridge.claimed",
+      "start-review": "operator.bridge.review-running",
+      "complete-review": "operator.bridge.review-completed",
+      block: "operator.bridge.blocked",
+      cancel: "operator.bridge.cancelled",
+      fail: "operator.bridge.failed",
+    };
+    const updated = appendAudit(normalizeRun({ ...checkedRun, operatorBridgeOutbox }), {
+      action: actionMap[action as Exclude<OperatorBridgeAction, "prepare">],
+      actor: parsed.actor,
+      summary: `OpenClaw/operator bridge outbox item ${action} recorded as ${transitioned.state}; Mission Control performed no external side effects.`,
+      metadata: { bridgeItemId: transitioned.id, handoffId: transitioned.handoffId, state: transitioned.state, operator: transitioned.operator ?? null, externalSideEffectsAllowed: false },
+    });
+    result = { run: normalizeRun(updated), item: transitioned, idempotent: false };
+    return result.run;
+  });
+
+  if (!result) return null;
+  await writeRuns(next);
+  return result;
 }

@@ -24,7 +24,7 @@ export const dispatchAdapters: DispatchAdapterCapability[] = [
     writeEnabled: false,
     requiresApproval: true,
     supportsDryRun: true,
-    blocker: "GitHub write scopes are intentionally not configured. Phase 7 may prepare a Thor/helper handoff only; it never mutates GitHub.",
+    blocker: "GitHub write scopes are intentionally not configured. Phase 8 may prepare a Thor/helper handoff only; it never mutates GitHub.",
   },
   {
     kind: "notification",
@@ -34,7 +34,7 @@ export const dispatchAdapters: DispatchAdapterCapability[] = [
     writeEnabled: false,
     requiresApproval: true,
     supportsDryRun: true,
-    blocker: "Outbound messages are disabled for SDF dispatch. Phase 7 does not send Telegram, email, Slack, or webhook notifications.",
+    blocker: "Outbound messages are disabled for SDF dispatch. Phase 8 does not send Telegram, email, Slack, or webhook notifications.",
   },
 ];
 
@@ -43,7 +43,7 @@ export function getDispatcherReadiness() {
     status: "review-only" as const,
     defaultMode: "review-dispatch" as const,
     liveExecutionEnabled: false,
-    summary: "Phase 7 can prepare approved Thor/helper review-mode operator handoffs. No GitHub writes, notifications, production writes, or direct agent spawning are enabled.",
+    summary: "Phase 8 can prepare approved Thor/helper review-mode operator handoffs. No GitHub writes, notifications, production writes, or direct agent spawning are enabled.",
     adapters: dispatchAdapters,
   };
 }
@@ -77,7 +77,7 @@ function planSteps(run: FactoryRun, job: LaunchQueueJob, mode: DispatchMode): Di
       externalWrite: false,
       approvalRequired: true,
       status: "blocked",
-      detail: "Write adapter disabled. Phase 7 only records operator handoff context; GitHub mutation is out of scope.",
+      detail: "Write adapter disabled. Phase 8 only records operator handoff context; GitHub mutation is out of scope.",
     },
     {
       id: "review-notification",
@@ -110,7 +110,7 @@ export function buildDispatchPlan(run: FactoryRun, job: LaunchQueueJob, mode: Di
     ...(job.approvalState === "approved" ? [] : ["Explicit Rex approval must be stored before review dispatch can be prepared."]),
     ...(job.approvalPolicy.canQueue ? [] : policyReasons),
     ...(reviewDispatch ? reviewAdapterBlockers : []),
-    ...(mode === "live" ? ["Live dispatch is disabled in Phase 7. Use review-dispatch/operator-handoff mode only."] : []),
+    ...(mode === "live" ? ["Live dispatch is disabled in Phase 8. Use review-dispatch/operator-handoff mode only."] : []),
     ...adapterBlockers,
   ].filter(Boolean);
   const idempotencyKey = reviewDispatch
@@ -127,7 +127,7 @@ export function buildDispatchPlan(run: FactoryRun, job: LaunchQueueJob, mode: Di
     approvedForDryRun,
     liveExecutionBlocked,
     summary: reviewDispatch && job.approvalPolicy.canPrepareReviewDispatch
-      ? "Approved queue job can be prepared as a Phase 7 Thor/helper review-mode operator handoff. No external side effects will occur."
+      ? "Approved queue job can be prepared as a Phase 8 OpenClaw/operator review-mode operator handoff. No external side effects will occur."
       : approvedForDryRun
         ? "Approved queue job is ready for dry-run dispatch review. No external side effects will occur."
         : "Dispatch review is blocked until approval/policy requirements are satisfied; live execution remains disabled.",
@@ -162,7 +162,7 @@ export function createDispatchAttempt(run: FactoryRun, job: LaunchQueueJob, mode
       ? "Thor/helper review-mode handoff prepared for StarLord/Thor operator execution. The web app did not spawn agents, write GitHub, send messages, or mutate production."
       : outcome === "planned"
         ? "Dry-run dispatch plan recorded. No external agents, GitHub writes, messages, or production mutations were performed."
-        : "Dispatch blocked by Phase 7 review/live-adapter safety policy. No external side effects occurred.",
+        : "Dispatch blocked by Phase 8 review/live-adapter safety policy. No external side effects occurred.",
   };
 }
 
