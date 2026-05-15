@@ -237,6 +237,7 @@ export function createRun(intake: BuildIntake, state: FactoryRunState = "Draft")
     approvalPolicy: defaultApprovalPolicy,
     dispatchAttempts: [],
     operatorBridgeOutbox: [],
+    operatorExecutionRecords: [],
     auditTrail: [],
   };
   return appendAudit(run, { action: "run.created", actor: "System", summary: "Factory run created through SDF API." });
@@ -263,6 +264,7 @@ export function createSeedRuns(): FactoryRun[] {
       launchQueue: [],
       dispatchAttempts: [],
       operatorBridgeOutbox: [],
+      operatorExecutionRecords: [],
       approvalPolicy: defaultApprovalPolicy,
       auditTrail: [
         {

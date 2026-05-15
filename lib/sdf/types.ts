@@ -26,6 +26,8 @@ export type DispatchOutcome = "planned" | "prepared" | "blocked" | "idempotent-h
 export type DispatchAdapterKind = "thor-agent" | "github-write" | "notification";
 export type OperatorBridgeState = "prepared" | "claimed" | "review-running" | "review-completed" | "blocked" | "cancelled" | "failed";
 export type OperatorBridgeAction = "prepare" | "claim" | "start-review" | "complete-review" | "block" | "cancel" | "fail";
+export type OperatorExecutionState = "pending-review" | "queued-for-operator" | "running-review" | "completed-review" | "blocked" | "cancelled" | "failed";
+export type OperatorExecutionAction = "queue" | "start-review" | "complete-review" | "block" | "cancel" | "fail";
 export type AuditAction =
   | "run.created"
   | "run.updated"
@@ -50,7 +52,14 @@ export type AuditAction =
   | "operator.bridge.review-completed"
   | "operator.bridge.blocked"
   | "operator.bridge.cancelled"
-  | "operator.bridge.failed";
+  | "operator.bridge.failed"
+  | "operator.execution.queued"
+  | "operator.execution.idempotent-hit"
+  | "operator.execution.running-review"
+  | "operator.execution.completed-review"
+  | "operator.execution.blocked"
+  | "operator.execution.cancelled"
+  | "operator.execution.failed";
 
 export type GeneratedTask = {
   id: string;
@@ -258,6 +267,40 @@ export type OperatorBridgeOutboxItem = {
   executionPacket: OperatorExecutionPacket;
 };
 
+export type OperatorExecutionRecord = {
+  id: string;
+  bridgeItemId: string;
+  handoffId: string;
+  runId: string;
+  runTitle: string;
+  queueJobId: string;
+  launchRequestId: string;
+  dispatchAttemptId?: string;
+  idempotencyKey: string;
+  state: OperatorExecutionState;
+  operatorTarget: string;
+  adapter: "openclaw-review-queue";
+  reviewModeOnly: true;
+  directExecutionEnabled: false;
+  liveExecutionBlocked: true;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  executionPacketSnapshot: OperatorExecutionPacket;
+  copyableCommand: string;
+  resultSummary?: string;
+  blockedReasons: string[];
+  auditMetadata: Record<string, string | number | boolean | null>;
+  events: Array<{
+    id: string;
+    action: OperatorExecutionAction;
+    actor: "Rex" | "Thor" | "System";
+    at: string;
+    summary: string;
+  }>;
+};
+
 export type SdfAuditEvent = {
   id: string;
   action: AuditAction;
@@ -283,6 +326,7 @@ export type FactoryRun = {
   approvalPolicy: ApprovalPolicyStatus;
   dispatchAttempts: DispatchAttempt[];
   operatorBridgeOutbox: OperatorBridgeOutboxItem[];
+  operatorExecutionRecords: OperatorExecutionRecord[];
   auditTrail: SdfAuditEvent[];
 };
 
@@ -300,5 +344,15 @@ export type SdfRunRegistryResponse = {
     liveExecutionEnabled: boolean;
     summary: string;
     adapters: DispatchAdapterCapability[];
+  };
+  executionAdapter: {
+    adapter: "openclaw-review-queue";
+    status: "review-queue-only";
+    reviewModeOnly: true;
+    directExecutionEnabled: false;
+    liveExecutionBlocked: true;
+    directRequested: boolean;
+    summary: string;
+    blockers: string[];
   };
 };
