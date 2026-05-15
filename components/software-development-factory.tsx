@@ -22,8 +22,8 @@ type ReviewCheckpoint = {
 };
 
 function statusTone(status: string) {
-  if (["Blocked", "Guarded", "Waiting", "Input needed", "Failing", "Changes requested", "Not connected", "rejected"].includes(status)) return "risk";
-  if (["Active", "In progress", "Recommended", "Lead", "Ready", "Running", "Passing", "Approved", "Done", "Complete", "approved", "launched", "live"].includes(status)) return "active";
+  if (["Blocked", "Guarded", "Waiting", "Input needed", "Failing", "Changes requested", "Not connected", "rejected", "blocked", "cancelled", "failed"].includes(status)) return "risk";
+  if (["Active", "In progress", "Recommended", "Lead", "Ready", "Running", "Passing", "Approved", "Done", "Complete", "approved", "launched", "live", "queued", "dispatched-ready", "configured"].includes(status)) return "active";
   return "warning";
 }
 
@@ -102,7 +102,7 @@ function FieldGroup({
 function IntegrationNotice({ adapter, error }: { adapter: SdfRunRegistryResponse["adapter"] | null; error: string }) {
   return (
     <div className="sdf-notice" role="note">
-      <strong>Phase 4 integration foundation:</strong> SDF now reads and writes runs through typed API routes backed by a safe server file adapter ({adapter?.source ?? "loading"}). Browser localStorage is retained only as a resilience fallback. {error ? `Current API issue: ${error}` : "GitHub sync and agent launch remain gated."}
+      <strong>Phase 5 live orchestration safety layer:</strong> SDF now reads and writes runs through typed API routes backed by a safe server file adapter ({adapter?.source ?? "loading"}), can attempt read-only GitHub PR/check sync from server env, and queues launch jobs idempotently behind approval policy. {error ? `Current API issue: ${error}` : "External writes and real agent dispatch remain blocked until explicit approval and a safe Phase 6 backend adapter exist."}
     </div>
   );
 }
@@ -165,6 +165,7 @@ export function SoftwareDevelopmentFactoryModule({
   const blockedRuns = runs.filter((run) => run.state === "Blocked" || run.readiness.some((item) => !item.complete)).length;
   const requiredGates = gates.filter((gate) => gate.status === "Required").length;
   const latestLaunch = selectedRun?.launchRequests[0];
+  const latestQueueJob = selectedRun?.launchQueue?.[0];
 
   function updateIntake(field: keyof BuildIntake, value: string) {
     setIntake((current) => ({ ...current, [field]: value }));
@@ -264,14 +265,14 @@ export function SoftwareDevelopmentFactoryModule({
       <div className="primary-column">
         <article className="panel-card accent-card sdf-intro-panel">
           <SectionHeader
-            detail="Phase 4 moves SDF to server/API-backed runs, checkpoint sync foundations, launch request approvals, and a non-secret audit trail while keeping real external actions gated."
-            eyebrow="Phase 4 · Integration foundations"
-            title="Operate development factory runs from a safer server boundary."
+            detail="Phase 5 turns the Phase 4 API foundation into a safer live-integration layer: read-only GitHub sync when configured, idempotent launch queueing, central approval policy, and audit-visible blockers."
+            eyebrow="Phase 5 · Live orchestration safety"
+            title="Queue real work safely before Phase 6 dispatch exists."
           />
           <div className="sdf-model-grid">
-            <div><span>1</span><h3>API registry</h3><p>Save, update, and read factory runs through typed SDF API routes with file-backed local development persistence.</p></div>
-            <div><span>2</span><h3>Sync checkpoints</h3><p>Show live/manual/simulated GitHub status fields without unsafe browser-side tokens or writes.</p></div>
-            <div><span>3</span><h3>Gate launches</h3><p>Prepare Thor/helper packets and log Rex approval state before any future real agent launch adapter runs.</p></div>
+            <div><span>1</span><h3>Read-only live sync</h3><p>Server-only GitHub adapter reads PR and check-run status when env is configured; otherwise manual/simulated fallback records blockers.</p></div>
+            <div><span>2</span><h3>Idempotent queue</h3><p>Launch jobs are keyed by run, packet, approval state, and blocker acknowledgement so repeated requests return existing work.</p></div>
+            <div><span>3</span><h3>Approval policy</h3><p>Rex approval, launch packet, blocker state, PR expectations, and adapter readiness are evaluated before any external-write path.</p></div>
           </div>
           <IntegrationNotice adapter={adapter} error={error} />
         </article>
@@ -342,16 +343,17 @@ export function SoftwareDevelopmentFactoryModule({
 
         {selectedRun ? (
           <article className="panel-card">
-            <SectionHeader detail="Prepare this packet for Thor/helper work. Phase 4 records approval/request state only; it never starts live external agents from the UI." eyebrow="Gated launch workflow" title="Prepared Thor/helper launch request" />
-            <div className="sdf-packet-toolbar"><button className="primary-action" onClick={copyPacket} type="button">{copied ? "Copied" : "Copy task packet"}</button><button disabled={saving} onClick={() => prepareLaunchRequest()} type="button">Prepare launch request</button><button disabled={saving} onClick={() => prepareLaunchRequest("approved")} type="button">Record Rex approval</button><span>Real launch remains blocked until Phase 5 connects a safe app-to-agent backend.</span></div>
-            {latestLaunch ? <div className="sdf-pr-grid"><div><span>Approval state</span><strong>{latestLaunch.approvalState}</strong></div><div><span>Launch ready</span><strong>{latestLaunch.launchReady ? "Yes" : "No"}</strong></div><div><span>Prepared</span><strong>{formatDate(latestLaunch.createdAt)}</strong></div><div><span>Next action</span><strong>{latestLaunch.nextAction}</strong></div></div> : <p>No launch request has been prepared for this run yet.</p>}
+            <SectionHeader detail="Prepare this packet for Thor/helper work. Phase 5 records an idempotent queue job and policy decision; it still never starts live external agents from the UI." eyebrow="Gated launch workflow" title="Prepared Thor/helper launch request" />
+            <div className="sdf-packet-toolbar"><button className="primary-action" onClick={copyPacket} type="button">{copied ? "Copied" : "Copy task packet"}</button><button disabled={saving} onClick={() => prepareLaunchRequest()} type="button">Queue launch job</button><button disabled={saving} onClick={() => prepareLaunchRequest("approved")} type="button">Record Rex approval + queue</button><span>Real dispatch remains blocked until Phase 6 connects a safe app-to-agent backend.</span></div>
+            {latestLaunch ? <div className="sdf-pr-grid"><div><span>Approval state</span><strong>{latestLaunch.approvalState}</strong></div><div><span>Policy state</span><strong>{selectedRun.approvalPolicy.state}</strong></div><div><span>Launch ready</span><strong>{latestLaunch.launchReady ? "Yes" : "No"}</strong></div><div><span>Prepared</span><strong>{formatDate(latestLaunch.createdAt)}</strong></div><div><span>Next action</span><strong>{latestLaunch.nextAction}</strong></div></div> : <p>No launch request has been prepared for this run yet.</p>}
+            {latestQueueJob ? <div className="sdf-task-body-grid"><div><h4>Latest queue job</h4><div className="sdf-pr-grid"><div><span>State</span><strong>{latestQueueJob.state}</strong></div><div><span>Idempotency key</span><strong>{latestQueueJob.idempotencyKey}</strong></div><div><span>Packet hash</span><strong>{latestQueueJob.packetHash}</strong></div><div><span>Dispatch adapter</span><strong>{latestQueueJob.dispatchAdapter}</strong></div></div></div><div><h4>Why blocked or ready</h4><ul className="detail-list compact-list">{(latestQueueJob.blockedReasons.length ? latestQueueJob.blockedReasons : [latestQueueJob.auditNote]).map((item) => <li key={item}>{item}</li>)}</ul></div></div> : null}
             <pre className="sdf-task-packet">{taskPacket}</pre>
           </article>
         ) : null}
 
         {selectedRun ? (
           <article className="panel-card">
-            <SectionHeader detail="GitHub status is modeled behind a server route. Live sync needs server credentials; manual/simulated data is safe for local development and review." eyebrow="GitHub checkpoint sync" title="Branch, commit, checks, review, blockers, and next action" />
+            <SectionHeader detail="GitHub status is modeled behind a server-only read adapter. Live sync needs env credentials with read permissions; manual/simulated data is safe for local development and review." eyebrow="GitHub checkpoint sync" title="Branch, commit, checks, review, blockers, and next action" />
             <div className="sdf-packet-toolbar"><button disabled={saving} onClick={() => syncCheckpoint("manual")} type="button">Record manual check</button><button disabled={saving} onClick={() => syncCheckpoint("simulated")} type="button">Simulate sync</button><button disabled={saving} onClick={() => syncCheckpoint("live")} type="button">Try live sync boundary</button><span>Source: {selectedRun.prCheckpoint.syncSource} · last checked {formatDate(selectedRun.prCheckpoint.lastCheckedAt)}</span></div>
             <div className="sdf-pr-grid">
               <div><span>PR URL</span><strong>{selectedRun.prCheckpoint.prUrl || "Pending manual PR"}</strong></div>
@@ -360,10 +362,13 @@ export function SoftwareDevelopmentFactoryModule({
               <div><span>Check status</span><strong>{selectedRun.prCheckpoint.checkStatus}</strong></div>
               <div><span>Review state</span><strong>{selectedRun.prCheckpoint.reviewState}</strong></div>
               <div><span>Live sync</span><strong>{selectedRun.prCheckpoint.liveSync ? "Connected" : "Not connected"}</strong></div>
+              <div><span>Live readiness</span><strong>{selectedRun.prCheckpoint.liveReadiness.status}</strong></div>
+              <div><span>Repository</span><strong>{selectedRun.prCheckpoint.liveReadiness.repository || "Not configured"}</strong></div>
+              <div><span>Required permission</span><strong>pull_requests/checks read only</strong></div>
             </div>
             <div className="sdf-task-body-grid">
-              <div><h4>Risks/blockers</h4><ul className="detail-list compact-list">{[...selectedRun.prCheckpoint.risks, ...selectedRun.prCheckpoint.blockers].map((item) => <li key={item}>{item}</li>)}</ul></div>
-              <div><h4>Next action</h4><p>{selectedRun.prCheckpoint.nextAction}</p></div>
+              <div><h4>Risks/blockers</h4><ul className="detail-list compact-list">{[...selectedRun.prCheckpoint.risks, ...selectedRun.prCheckpoint.blockers, selectedRun.prCheckpoint.liveReadiness.blocker].filter(Boolean).map((item) => <li key={item}>{item}</li>)}</ul></div>
+              <div><h4>Next action</h4><p>{selectedRun.prCheckpoint.nextAction}</p>{selectedRun.prCheckpoint.liveReadiness.lastError ? <p>Last live error: {selectedRun.prCheckpoint.liveReadiness.lastError}</p> : null}</div>
             </div>
           </article>
         ) : null}
@@ -394,11 +399,11 @@ export function SoftwareDevelopmentFactoryModule({
       <div className="secondary-column">
         <article className="panel-card control-panel"><SectionHeader detail="Factory mode changes how much Rex steers, not whether Thor still verifies and opens a PR." eyebrow="Factory mode" title="Control level" /><div className="sdf-mode-stack">{modes.map((mode) => <button aria-pressed={intake.mode === mode.name} className={`sdf-mode-select${intake.mode === mode.name ? " selected" : ""}`} key={mode.id} onClick={() => updateIntake("mode", mode.name)} type="button"><div className="control-card-head"><strong>{mode.name}</strong><span className={`status-pill ${statusTone(mode.state)}`}>{mode.state}</span></div><p>{mode.bestFor}</p></button>)}</div></article>
         <article className="panel-card"><SectionHeader detail="Lane ownership is explicit before Thor asks any helper agent to build." eyebrow="Helper-agent assignment board" title="Factory lanes" /><div className="sdf-agent-board">{agents.map((agent) => <div className="sdf-agent-card" key={agent.id}><div className="skill-topline"><div><p className="project-priority">{agent.role}</p><h3>{agent.name}</h3></div><span className={`status-pill ${statusTone(agent.state)}`}>{agent.state}</span></div><p>{agent.handoff}</p></div>)}</div></article>
-        <article className="panel-card accent-card"><SectionHeader detail="Rex should see the decision surface before live work starts." eyebrow="Rex checkpoint" title="Ready, needs input, blocked, approval" /><div className="sdf-checkpoint-list">{reviewCheckpoints.map((checkpoint) => <div className="sdf-checkpoint-card" key={checkpoint.label}><div className="control-card-head"><h3>{checkpoint.label}</h3><span className={`status-pill ${statusTone(checkpoint.state)}`}>{checkpoint.state}</span></div><p>{checkpoint.detail}</p></div>)}</div></article>
+        <article className="panel-card accent-card"><SectionHeader detail="Rex should see the decision surface before live work starts." eyebrow="Rex checkpoint" title="Ready, needs input, blocked, approval" /><div className="sdf-checkpoint-list">{reviewCheckpoints.map((checkpoint) => <div className="sdf-checkpoint-card" key={checkpoint.label}><div className="control-card-head"><h3>{checkpoint.label}</h3><span className={`status-pill ${statusTone(checkpoint.state)}`}>{checkpoint.state}</span></div><p>{checkpoint.detail}</p></div>)}</div>{selectedRun ? <div className="sdf-checkpoint-list"><h3>Approval policy</h3>{selectedRun.approvalPolicy.requirements.map((requirement) => <div className="sdf-checkpoint-card" key={requirement.id}><div className="control-card-head"><h3>{requirement.label}</h3><span className={`status-pill ${statusTone(requirement.passed ? "Approved" : "Blocked")}`}>{requirement.passed ? "Passed" : "Blocked"}</span></div><p>{requirement.detail}</p></div>)}</div> : null}</article>
         <article className="panel-card control-panel"><SectionHeader detail="Every factory run should show what evidence exists before it asks Rex to trust the output." eyebrow="Quality gates" title="Checkpoint standards" /><div className="control-grid">{gates.map((gate) => <div className="control-card" key={gate.id}><div className="control-card-head"><h3>{gate.label}</h3><span className={`status-pill ${statusTone(gate.status)}`}>{gate.status}</span></div><p>{gate.evidence}</p></div>)}</div></article>
         <article className="panel-card"><SectionHeader detail="The seeded SDF foundation remains visible so Rex can see how Phase 4 maps onto the factory model." eyebrow="Foundation pipeline" title="Factory stages already defined" /><div className="sdf-pipeline-rail">{pipeline.map((stage, index) => <div className="pipeline-step" key={stage.id}><span className="pipeline-index">{index + 1}</span><div><div className="pipeline-headline"><h3>{stage.label}</h3><span className={`status-pill ${statusTone(stage.status)}`}>{stage.status}</span></div><p>{stage.detail}</p><div className="thread-meta">Owner: {stage.owner}</div></div></div>)}</div></article>
         <article className="panel-card"><SectionHeader detail="Seeded outputs keep the older SDF concept visible while Phase 4 adds server-backed operations." eyebrow="Seeded outputs" title="Existing phase tasks and Rex input queue" /><div className="sdf-task-list compact-sdf-list">{tasks.map((task) => <div className="ops-task-card" key={task.id}><div className="ops-task-topline"><div><p className="project-priority">{task.phase} · {task.owner}</p><h3>{task.title}</h3></div><span className={`status-pill ${statusTone(task.status)}`}>{task.status}</span></div></div>)}</div><div className="dispatch-list sdf-rex-input-list">{rexInputs.map((item) => <div className="dispatch-card" key={item.id}><p className="project-priority">{item.priority} · {item.neededFor}</p><h3>{item.title}</h3><p>{item.prompt}</p></div>)}</div></article>
-        <article className="panel-card sdf-readiness-card"><p className="eyebrow">Phase 5 live orchestration</p><h2>Connect real GitHub and agent adapters only after credentials, approval policy, and execution backend are ready.</h2><p>Phase 4 creates the durable boundary: API routes, file adapter, env-documented live sync hook, prepared launch packet, Rex approval log, and audit history.</p></article>
+        <article className="panel-card sdf-readiness-card"><p className="eyebrow">Phase 6 dispatch path</p><h2>Real GitHub writes and agent dispatch stay blocked until a safe backend adapter is explicitly connected.</h2><p>Phase 5 creates the live-read boundary, idempotent launch queue, approval policy, audit evidence, and blocker copy Rex needs before trusting automated execution.</p></article>
       </div>
     </section>
   );

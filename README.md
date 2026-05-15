@@ -87,14 +87,16 @@ Security notes:
 
 Phase 1 of the Agent OS is intentionally frontend-first. It establishes the operating model, typed seed data, and reviewable UI surfaces before replacing the static data with real telemetry from sessions, commands, memory, tools, GitHub, and scheduler state.
 
-## Software Development Factory Phase 4
+## Software Development Factory Phase 5
 
-SDF Phase 4 adds the first server-side integration foundations for `/sdf`:
+SDF Phase 5 adds the live-orchestration safety layer for `/sdf`:
 
 - typed API-backed factory run registry under `/api/sdf/runs`
 - safe local file persistence at `.mission-control-data/sdf/runs.json` (ignored)
-- GitHub checkpoint sync model with `live`, `manual`, and `simulated` sources
-- gated Thor/helper launch request packets with Rex approval state
-- non-secret audit events for run updates, sync attempts, launch requests, and approval changes
+- server-only, read-only GitHub PR/check sync when `SDF_GITHUB_TOKEN`/`SDF_GITHUB_REPOSITORY` (or GitHub fallbacks) are configured
+- manual/simulated fallback with blocker copy when live sync is unavailable
+- idempotent Thor/helper launch queue jobs with approval-state-aware keys
+- central approval policy covering Rex approval, launch packet, blockers, PR/check expectations, and adapter readiness
+- non-secret audit events for run updates, sync attempts, queue decisions, idempotent hits, and approval changes
 
-No live external actions are triggered from the UI in this phase. GitHub live sync requires server-only `GITHUB_TOKEN` and `GITHUB_REPOSITORY`; without them, the app records manual/simulated status and an explicit blocker. See `docs/sdf-phase4.md` for adapter boundaries and Phase 5 live orchestration notes.
+No external writes are triggered from the UI in this phase. GitHub writes, real agent dispatch, messages, production mutations, and PR actions remain blocked until an explicit Phase 6 backend adapter is implemented and Rex approval policy passes. See `docs/sdf-phase5.md` for environment variables, queue idempotency, approval policy, and the Phase 6 dispatch path.

@@ -1,4 +1,4 @@
-import type { BuildIntake, FactoryRun, FactoryRunState, GeneratedTask, LaunchRequest, SdfAuditEvent } from "./types";
+import type { ApprovalPolicyStatus, BuildIntake, FactoryRun, FactoryRunState, GeneratedTask, GitHubLiveReadiness, LaunchRequest, SdfAuditEvent } from "./types";
 
 export const defaultIntake: BuildIntake = {
   appName: "Mission Control SDF Phase 4",
@@ -24,6 +24,29 @@ export const appTypeTemplates = [
   "SaaS app workflow",
   "API-backed feature",
 ];
+
+export const defaultGitHubLiveReadiness: GitHubLiveReadiness = {
+  status: "not-configured",
+  configured: false,
+  repository: "",
+  tokenConfigured: false,
+  permissions: "Read-only GitHub REST API access: pull_requests:read and checks/statuses read. No GitHub mutations are performed by SDF Phase 5.",
+  blocker: "Live GitHub sync needs server-only SDF_GITHUB_TOKEN (or GITHUB_TOKEN) and SDF_GITHUB_REPOSITORY (or GITHUB_REPOSITORY).",
+  lastError: "",
+};
+
+export const defaultApprovalPolicy: ApprovalPolicyStatus = {
+  state: "blocked",
+  readyForDispatch: false,
+  canQueue: false,
+  canDispatchExternalWork: false,
+  reasons: ["No approval policy evaluation has been recorded yet."],
+  requirements: [
+    { id: "rex-approval", label: "Explicit Rex approval recorded", passed: false, detail: "Rex approval is required before external work dispatch." },
+    { id: "launch-packet", label: "Launch packet generated", passed: false, detail: "Prepare a launch packet before queueing." },
+    { id: "live-adapter", label: "Live adapter configured before dispatch", passed: false, detail: "Phase 5 keeps external dispatch disabled until a safe backend adapter exists." },
+  ],
+};
 
 const basePhaseBlueprint = [
   {
@@ -151,6 +174,7 @@ export function buildPrCheckpoint(intake: BuildIntake) {
     liveSync: false,
     syncSource: "simulated" as const,
     lastCheckedAt: nowIso(),
+    liveReadiness: defaultGitHubLiveReadiness,
   };
 }
 
@@ -208,6 +232,8 @@ export function createRun(intake: BuildIntake, state: FactoryRunState = "Draft")
     prCheckpoint: buildPrCheckpoint(intake),
     readiness: buildReadiness(intake),
     launchRequests: [],
+    launchQueue: [],
+    approvalPolicy: defaultApprovalPolicy,
     auditTrail: [],
   };
   return appendAudit(run, { action: "run.created", actor: "System", summary: "Factory run created through SDF API." });
@@ -229,7 +255,10 @@ export function createSeedRuns(): FactoryRun[] {
         syncSource: "simulated",
         lastCheckedAt: "2026-05-15T07:32:00.000Z",
         nextAction: "Use the API-backed registry, prepare a gated launch request, then enable live sync only after backend credentials are configured.",
+        liveReadiness: defaultGitHubLiveReadiness,
       },
+      launchQueue: [],
+      approvalPolicy: defaultApprovalPolicy,
       auditTrail: [
         {
           id: "audit-seed-phase4",
