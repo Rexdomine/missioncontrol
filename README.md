@@ -87,6 +87,19 @@ Security notes:
 
 Phase 1 of the Agent OS is intentionally frontend-first. It establishes the operating model, typed seed data, and reviewable UI surfaces before replacing the static data with real telemetry from sessions, commands, memory, tools, GitHub, and scheduler state.
 
+## Software Development Factory Phase 8
+
+SDF Phase 8 adds a safe OpenClaw/operator bridge outbox for approved `/sdf` handoff packets:
+
+- typed `OperatorBridgeOutboxItem` and `OperatorExecutionPacket` models
+- `POST /api/sdf/runs/[id]/operator-bridge` for prepare, claim, review-running, complete, block, cancel, and fail lifecycle operations
+- explicit `approvalIntent: "rex-approved-review-dispatch"` plus `reviewOnly: true` before bridge preparation
+- idempotent bridge preparation for approved queue jobs
+- UI controls for bridge readiness, outbox state, lifecycle transitions, structured packet copy/export, and clear next actions
+- non-secret audit events for prepared, idempotent-hit, claimed, review-running, review-completed, blocked, cancelled, and failed states
+
+Phase 8 is still review-mode only. Mission Control does not spawn OpenClaw sessions, run shell commands, mutate GitHub, send notifications, write production, or perform autonomous external side effects. StarLord/Thor uses the prepared packet manually or through a future approved server bridge. See `docs/sdf-phase8.md` for the outbox lifecycle, API examples, approval/idempotency rules, and Phase 9 path.
+
 ## Software Development Factory Phase 7
 
 SDF Phase 7 adds the first controlled review-dispatch path for `/sdf`:

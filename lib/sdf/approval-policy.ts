@@ -68,7 +68,7 @@ export function evaluateApprovalPolicy(run: FactoryRun, options: { approvalState
       passed: !options.dispatchRequested || reviewAdapter.enabled,
       detail: options.dispatchRequested
         ? reviewAdapter.blocker
-        : "Phase 7 review-mode adapter can prepare an operator handoff only; it never spawns agents from the web app.",
+        : "Phase 8 review-mode adapter can prepare an operator handoff only; it never spawns agents from the web app.",
     },
     {
       id: "external-write-adapters",

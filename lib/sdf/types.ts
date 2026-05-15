@@ -24,6 +24,8 @@ export type LiveAdapterStatus = "configured" | "not-configured" | "blocked";
 export type DispatchMode = "dry-run" | "review" | "review-dispatch" | "operator-handoff" | "live";
 export type DispatchOutcome = "planned" | "prepared" | "blocked" | "idempotent-hit";
 export type DispatchAdapterKind = "thor-agent" | "github-write" | "notification";
+export type OperatorBridgeState = "prepared" | "claimed" | "review-running" | "review-completed" | "blocked" | "cancelled" | "failed";
+export type OperatorBridgeAction = "prepare" | "claim" | "start-review" | "complete-review" | "block" | "cancel" | "fail";
 export type AuditAction =
   | "run.created"
   | "run.updated"
@@ -40,7 +42,15 @@ export type AuditAction =
   | "dispatch.review-prepared"
   | "dispatch.adapter.checked"
   | "dispatch.policy.failed"
-  | "operator.handoff-ready";
+  | "operator.handoff-ready"
+  | "operator.bridge.prepared"
+  | "operator.bridge.idempotent-hit"
+  | "operator.bridge.claimed"
+  | "operator.bridge.review-running"
+  | "operator.bridge.review-completed"
+  | "operator.bridge.blocked"
+  | "operator.bridge.cancelled"
+  | "operator.bridge.failed";
 
 export type GeneratedTask = {
   id: string;
@@ -200,6 +210,54 @@ export type DispatchAttempt = {
   note: string;
 };
 
+export type OperatorExecutionPacket = {
+  schemaVersion: "mission-control.sdf.operator-packet.v1";
+  packetType: "openclaw-review-mode-handoff";
+  reviewModeOnly: true;
+  externalSideEffectsAllowed: false;
+  handoffId: string;
+  runId: string;
+  runTitle: string;
+  queueJobId: string;
+  dispatchAttemptId?: string;
+  idempotencyKey: string;
+  packetHash: string;
+  approvalIntent: "rex-approved-review-dispatch";
+  operatorInstructions: string[];
+  disabledActions: string[];
+  taskPacket: string;
+  audit: {
+    preparedBy: "Rex" | "Thor" | "System";
+    preparedAt: string;
+    approvalNote: string;
+  };
+};
+
+export type OperatorBridgeOutboxItem = {
+  id: string;
+  handoffId: string;
+  runId: string;
+  queueJobId: string;
+  launchRequestId: string;
+  dispatchAttemptId?: string;
+  idempotencyKey: string;
+  state: OperatorBridgeState;
+  actor: "Rex" | "Thor" | "System";
+  operator?: string;
+  packetHash: string;
+  reviewModeOnly: true;
+  externalExecution: false;
+  approvalIntent: "rex-approved-review-dispatch";
+  createdAt: string;
+  updatedAt: string;
+  claimedAt?: string;
+  completedAt?: string;
+  blockedReasons: string[];
+  notes: string[];
+  auditMetadata: Record<string, string | number | boolean | null>;
+  executionPacket: OperatorExecutionPacket;
+};
+
 export type SdfAuditEvent = {
   id: string;
   action: AuditAction;
@@ -224,6 +282,7 @@ export type FactoryRun = {
   launchQueue: LaunchQueueJob[];
   approvalPolicy: ApprovalPolicyStatus;
   dispatchAttempts: DispatchAttempt[];
+  operatorBridgeOutbox: OperatorBridgeOutboxItem[];
   auditTrail: SdfAuditEvent[];
 };
 
