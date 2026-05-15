@@ -30,7 +30,7 @@ export const defaultGitHubLiveReadiness: GitHubLiveReadiness = {
   configured: false,
   repository: "",
   tokenConfigured: false,
-  permissions: "Read-only GitHub REST API access: pull_requests:read and checks/statuses read. No GitHub mutations are performed by SDF Phase 5.",
+  permissions: "Read-only GitHub REST API access: pull_requests:read and checks/statuses read. No GitHub mutations are performed by SDF Phase 6.",
   blocker: "Live GitHub sync needs server-only SDF_GITHUB_TOKEN (or GITHUB_TOKEN) and SDF_GITHUB_REPOSITORY (or GITHUB_REPOSITORY).",
   lastError: "",
 };
@@ -44,7 +44,7 @@ export const defaultApprovalPolicy: ApprovalPolicyStatus = {
   requirements: [
     { id: "rex-approval", label: "Explicit Rex approval recorded", passed: false, detail: "Rex approval is required before external work dispatch." },
     { id: "launch-packet", label: "Launch packet generated", passed: false, detail: "Prepare a launch packet before queueing." },
-    { id: "live-adapter", label: "Live adapter configured before dispatch", passed: false, detail: "Phase 5 keeps external dispatch disabled until a safe backend adapter exists." },
+    { id: "live-adapter", label: "Live adapter configured before dispatch", passed: false, detail: "Phase 6 keeps external dispatch disabled until future safe live adapters exist." },
   ],
 };
 
@@ -234,6 +234,7 @@ export function createRun(intake: BuildIntake, state: FactoryRunState = "Draft")
     launchRequests: [],
     launchQueue: [],
     approvalPolicy: defaultApprovalPolicy,
+    dispatchAttempts: [],
     auditTrail: [],
   };
   return appendAudit(run, { action: "run.created", actor: "System", summary: "Factory run created through SDF API." });
@@ -258,6 +259,7 @@ export function createSeedRuns(): FactoryRun[] {
         liveReadiness: defaultGitHubLiveReadiness,
       },
       launchQueue: [],
+      dispatchAttempts: [],
       approvalPolicy: defaultApprovalPolicy,
       auditTrail: [
         {
