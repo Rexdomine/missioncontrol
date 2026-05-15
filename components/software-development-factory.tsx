@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { appTypeTemplates, buildReadiness, buildTaskPacket, defaultIntake, generateTaskGraph } from "@/lib/sdf/factory";
-import type { BuildIntake, DispatchAttempt, FactoryModeName, FactoryRun, FactoryRunState, OperatorBridgeAction, OperatorBridgeOutboxItem, OperatorExecutionAction, OperatorExecutionRecord, SdfRunRegistryResponse } from "@/lib/sdf/types";
+import type { BuildIntake, DispatchAttempt, FactoryModeName, FactoryRun, FactoryRunState, OpenClawSessionsBridgeSubmissionAction, OpenClawSessionsBridgeSubmissionAttempt, OperatorBridgeAction, OperatorBridgeOutboxItem, OperatorExecutionAction, OperatorExecutionRecord, SdfRunRegistryResponse } from "@/lib/sdf/types";
 import type {
   SdfAgentLane,
   SdfFactoryMode,
@@ -102,7 +102,7 @@ function FieldGroup({
 function IntegrationNotice({ adapter, error }: { adapter: SdfRunRegistryResponse["adapter"] | null; error: string }) {
   return (
     <div className="sdf-notice" role="note">
-      <strong>Phase 9 OpenClaw/operator execution bridge:</strong> SDF reads and writes runs through typed API routes backed by a safe server file adapter ({adapter?.source ?? "loading"}), queues launch jobs idempotently behind approval policy, prepares review-mode outbox packets, and now queues copyable operator execution records for StarLord/Thor. {error ? `Current API issue: ${error}` : "GitHub writes, notifications, production writes, shell commands, and web-app agent spawning remain disabled."}
+      <strong>Phase 10 secure OpenClaw sessions bridge:</strong> SDF reads and writes runs through typed API routes backed by a safe server file adapter ({adapter?.source ?? "loading"}), queues launch jobs idempotently behind approval policy, prepares review-mode outbox packets, and now records dry-run sessions bridge submissions behind allowlist, approval proof, readiness, and audit checks. {error ? `Current API issue: ${error}` : "Live OpenClaw session submission, GitHub writes, notifications, production writes, shell commands, and web-app agent spawning remain disabled by default."}
     </div>
   );
 }
@@ -132,9 +132,11 @@ export function SoftwareDevelopmentFactoryModule({
   const [adapter, setAdapter] = useState<SdfRunRegistryResponse["adapter"] | null>(null);
   const [dispatcher, setDispatcher] = useState<SdfRunRegistryResponse["dispatcher"] | null>(null);
   const [executionAdapter, setExecutionAdapter] = useState<SdfRunRegistryResponse["executionAdapter"] | null>(null);
+  const [sessionsBridge, setSessionsBridge] = useState<SdfRunRegistryResponse["sessionsBridge"] | null>(null);
   const [latestDispatch, setLatestDispatch] = useState<DispatchAttempt | null>(null);
   const [latestBridgeItem, setLatestBridgeItem] = useState<OperatorBridgeOutboxItem | null>(null);
   const [latestExecution, setLatestExecution] = useState<OperatorExecutionRecord | null>(null);
+  const [latestSubmission, setLatestSubmission] = useState<OpenClawSessionsBridgeSubmissionAttempt | null>(null);
 
   async function loadRuns() {
     setLoading(true);
@@ -148,6 +150,7 @@ export function SoftwareDevelopmentFactoryModule({
       setAdapter(data.adapter);
       setDispatcher(data.dispatcher);
       setExecutionAdapter(data.executionAdapter);
+      setSessionsBridge(data.sessionsBridge);
       setSelectedRunId((current) => (nextRuns.some((run) => run.id === current) ? current : nextRuns[0]?.id ?? ""));
       if (typeof window !== "undefined") window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextRuns));
     } catch (apiError) {
@@ -178,6 +181,7 @@ export function SoftwareDevelopmentFactoryModule({
   const latestHandoff = latestQueueJob?.reviewHandoff ?? activeDispatch?.reviewHandoff;
   const activeBridgeItem = latestBridgeItem ?? selectedRun?.operatorBridgeOutbox?.[0] ?? null;
   const activeExecution = latestExecution ?? selectedRun?.operatorExecutionRecords?.[0] ?? null;
+  const activeSubmission = latestSubmission ?? activeExecution?.submissionAttempts?.[0] ?? null;
 
   function updateIntake(field: keyof BuildIntake, value: string) {
     setIntake((current) => ({ ...current, [field]: value }));
@@ -358,6 +362,49 @@ export function SoftwareDevelopmentFactoryModule({
     }
   }
 
+  async function submitOpenClawSessionBridge(action: OpenClawSessionsBridgeSubmissionAction, overrides: Partial<{ allowlistedRepoPath: string; targetId: string; agentId: string; operator: string }> = {}) {
+    if (!selectedRun || !activeExecution) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/sdf/runs/${selectedRun.id}/operator-bridge/execute/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          executionId: activeExecution.id,
+          handoffId: activeExecution.handoffId,
+          idempotencyKey: activeExecution.idempotencyKey,
+          target: {
+            targetId: overrides.targetId ?? "thor-review-mission-control",
+            agentId: overrides.agentId ?? "thor",
+            operator: overrides.operator ?? "Thor",
+            mode: "review",
+          },
+          allowlistedRepoPath: overrides.allowlistedRepoPath ?? "/home/node/.openclaw/workspace/missioncontrol",
+          approvalProof: {
+            approvalIntent: "rex-approved-review-dispatch",
+            approvedBy: "Rex",
+            approvedAt: new Date().toISOString(),
+            approvalNote: "Rex approval proof recorded for Phase 10 review-mode dry-run bridge validation only.",
+          },
+          requestedBy: "System",
+          auditReason: "UI requested Phase 10 secure OpenClaw sessions bridge validation.",
+        }),
+      });
+      const payload = (await response.json()) as { run?: FactoryRun; execution?: OperatorExecutionRecord; attempt?: OpenClawSessionsBridgeSubmissionAttempt; readiness?: SdfRunRegistryResponse["sessionsBridge"]; error?: string };
+      if (!response.ok && !payload.run) throw new Error(payload.error ?? `Sessions bridge submission failed with ${response.status}`);
+      if (payload.run) setRuns((current) => current.map((run) => (run.id === payload.run?.id ? payload.run : run)));
+      if (payload.execution) setLatestExecution(payload.execution);
+      if (payload.attempt) setLatestSubmission(payload.attempt);
+      if (payload.readiness) setSessionsBridge(payload.readiness);
+    } catch (apiError) {
+      setError(apiError instanceof Error ? apiError.message : "Unable to submit Phase 10 OpenClaw sessions bridge request");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function copyExecutionCommand() {
     if (!activeExecution?.copyableCommand || typeof navigator === "undefined") return;
     await navigator.clipboard.writeText(activeExecution.copyableCommand);
@@ -462,6 +509,10 @@ export function SoftwareDevelopmentFactoryModule({
             {latestHandoff ? <div className="sdf-task-body-grid"><div><h4>Prepared handoff packet</h4><div className="sdf-pr-grid"><div><span>Handoff state</span><strong>{latestHandoff.state}</strong></div><div><span>Handoff key</span><strong>{latestHandoff.idempotencyKey}</strong></div><div><span>Adapter</span><strong>{latestHandoff.adapter}</strong></div><div><span>Review only</span><strong>{latestHandoff.reviewModeOnly ? "Yes" : "No"}</strong></div><div><span>External execution</span><strong>{latestHandoff.externalExecution ? "Yes" : "No"}</strong></div></div></div><div><h4>Exact operator next action</h4><p>{latestHandoff.operatorNextAction}</p><ul className="detail-list compact-list">{(latestHandoff.blockerReasons.length ? latestHandoff.blockerReasons : ["Waiting for StarLord/Thor operator to run the packet in a separate review-mode agent session."]).map((item) => <li key={item}>{item}</li>)}</ul></div></div> : null}
             {activeBridgeItem ? <div className="sdf-task-body-grid"><div><h4>OpenClaw/operator bridge outbox</h4><div className="sdf-pr-grid"><div><span>State</span><strong>{activeBridgeItem.state}</strong></div><div><span>Handoff id</span><strong>{activeBridgeItem.handoffId}</strong></div><div><span>Run id</span><strong>{activeBridgeItem.runId}</strong></div><div><span>Queue job id</span><strong>{activeBridgeItem.queueJobId}</strong></div><div><span>Actor/operator</span><strong>{activeBridgeItem.operator ?? activeBridgeItem.actor}</strong></div><div><span>Review only</span><strong>{activeBridgeItem.reviewModeOnly ? "Yes" : "No"}</strong></div><div><span>External execution</span><strong>{activeBridgeItem.externalExecution ? "Yes" : "No"}</strong></div><div><span>Updated</span><strong>{formatDate(activeBridgeItem.updatedAt)}</strong></div></div></div><div><h4>Operator lifecycle controls</h4><div className="sdf-packet-toolbar"><button disabled={saving} onClick={() => updateOperatorBridge("claim", { note: "StarLord/Thor operator claimed the review-mode bridge packet." })} type="button">Claim</button><button disabled={saving} onClick={() => updateOperatorBridge("start-review", { note: "StarLord/Thor operator marked review-running." })} type="button">Mark review running</button><button disabled={saving} onClick={() => updateOperatorBridge("complete-review", { note: "Review-mode operator work completed; record branch, commit, PR, verification, and blockers separately." })} type="button">Complete review</button><button disabled={saving} onClick={() => updateOperatorBridge("block", { blockedReason: "Operator marked this bridge blocked pending Rex/Thor follow-up." })} type="button">Block</button><button disabled={saving} onClick={() => updateOperatorBridge("cancel", { note: "Operator bridge cancelled without external side effects." })} type="button">Cancel</button><button disabled={saving} onClick={() => updateOperatorBridge("fail", { note: "Operator bridge failed safely without external side effects." })} type="button">Fail</button></div><p>Packet type: {activeBridgeItem.executionPacket.packetType} · schema {activeBridgeItem.executionPacket.schemaVersion}</p><ul className="detail-list compact-list">{(activeBridgeItem.blockedReasons.length ? activeBridgeItem.blockedReasons : activeBridgeItem.notes).map((item) => <li key={item}>{item}</li>)}</ul></div></div> : <div className="sdf-notice" role="note"><strong>Bridge not prepared yet:</strong> record Rex approval, keep reviewOnly=true, then prepare the OpenClaw bridge. Repeated prepare returns the same idempotent outbox item.</div>}
             <div className="sdf-notice" role="note"><strong>Phase 9 execution bridge readiness:</strong> {executionAdapter?.summary ?? "Review-mode execution queue readiness is loading."}</div>
+            <div className="sdf-notice" role="note"><strong>Phase 10 sessions bridge readiness:</strong> {sessionsBridge?.summary ?? "Secure sessions bridge readiness is loading."} Live submission: {sessionsBridge?.liveSubmissionReady ? "enabled" : "blocked by default"}. Dry-run: {sessionsBridge?.dryRunAvailable ? "available" : "unavailable"}.</div>
+            {sessionsBridge ? <div className="sdf-task-body-grid"><div><h4>Allowlisted review target</h4><div className="sdf-pr-grid"><div><span>Status</span><strong>{sessionsBridge.status}</strong></div><div><span>Enabled env</span><strong>{sessionsBridge.enabled ? "Yes" : "No"}</strong></div><div><span>Endpoint</span><strong>{sessionsBridge.endpointConfigured ? "Configured" : "Missing"}</strong></div><div><span>Token</span><strong>{sessionsBridge.tokenConfigured ? "Configured server-side" : "Missing"}</strong></div><div><span>Contract</span><strong>{sessionsBridge.contractVersionConfigured ? "Pinned" : "Missing"}</strong></div><div><span>Target</span><strong>{sessionsBridge.allowlistedTargets[0]?.targetId ?? "No target"}</strong></div></div></div><div><h4>Bridge blockers / next action</h4><ul className="detail-list compact-list">{sessionsBridge.blockers.map((item) => <li key={item}>{item}</li>)}</ul></div></div> : null}
+            {activeExecution ? <div className="sdf-packet-toolbar"><button disabled={saving} onClick={() => submitOpenClawSessionBridge("dry-run")} type="button">Dry-run sessions submit</button><button disabled={saving} onClick={() => submitOpenClawSessionBridge("submit")} type="button">Try live submit blocker</button><button disabled={saving} onClick={() => submitOpenClawSessionBridge("dry-run", { allowlistedRepoPath: "/tmp/outside-mission-control" })} type="button">Test bad path blocker</button><span>Dry-run records audit/idempotency. Live submit remains blocked until a secure sessions API client is approved and configured.</span></div> : null}
+            {activeSubmission ? <div className="sdf-task-body-grid"><div><h4>Phase 10 sessions bridge attempt</h4><div className="sdf-pr-grid"><div><span>Action</span><strong>{activeSubmission.action}</strong></div><div><span>Accepted</span><strong>{activeSubmission.accepted ? "Yes" : "No"}</strong></div><div><span>Blocked</span><strong>{activeSubmission.blocked ? "Yes" : "No"}</strong></div><div><span>Idempotency</span><strong>{activeSubmission.idempotencyStatus}</strong></div><div><span>Audit event</span><strong>{activeSubmission.auditEventId}</strong></div><div><span>Next action</span><strong>{activeSubmission.nextAction}</strong></div></div></div><div><h4>Submission blockers</h4><ul className="detail-list compact-list">{(activeSubmission.blockerReasons.length ? activeSubmission.blockerReasons : ["Dry-run accepted. No live OpenClaw session was spawned."]).map((item) => <li key={item}>{item}</li>)}</ul></div></div> : null}
             {activeBridgeItem ? <div className="sdf-packet-toolbar"><button disabled={saving} onClick={() => updateOperatorExecution("queue")} type="button">Queue review execution</button><button disabled={saving || !activeExecution} onClick={() => updateOperatorExecution("start-review", { resultSummary: "StarLord/Thor operator started this packet in a separate review-mode flow." })} type="button">Mark execution running</button><button disabled={saving || !activeExecution} onClick={() => updateOperatorExecution("complete-review", { resultSummary: "Review-mode operator execution completed. Record branch, commit, PR, verification, and blockers in the handoff." })} type="button">Complete execution</button><button disabled={saving || !activeExecution} onClick={() => updateOperatorExecution("block", { blockedReason: "Execution blocked pending Rex/Thor follow-up; no web-app side effects occurred." })} type="button">Block execution</button><button disabled={saving || !activeExecution} onClick={() => updateOperatorExecution("cancel", { resultSummary: "Review-mode execution cancelled before external work." })} type="button">Cancel execution</button><button disabled={saving || !activeExecution} onClick={() => updateOperatorExecution("fail", { resultSummary: "Review-mode execution failed safely; no web-app side effects occurred." })} type="button">Fail execution</button><button disabled={!activeExecution?.copyableCommand} onClick={copyExecutionCommand} type="button">Copy operator command</button><span>Review-mode queue only; direct OpenClaw sessions API is unsupported inside Mission Control.</span></div> : null}
             {activeExecution ? <div className="sdf-task-body-grid"><div><h4>Phase 9 operator execution record</h4><div className="sdf-pr-grid"><div><span>State</span><strong>{activeExecution.state}</strong></div><div><span>Execution id</span><strong>{activeExecution.id}</strong></div><div><span>Bridge item</span><strong>{activeExecution.bridgeItemId}</strong></div><div><span>Operator target</span><strong>{activeExecution.operatorTarget}</strong></div><div><span>Adapter</span><strong>{activeExecution.adapter}</strong></div><div><span>Direct execution</span><strong>{activeExecution.directExecutionEnabled ? "Enabled" : "Blocked"}</strong></div><div><span>Live writes</span><strong>{activeExecution.liveExecutionBlocked ? "Blocked" : "Enabled"}</strong></div><div><span>Updated</span><strong>{formatDate(activeExecution.updatedAt)}</strong></div></div></div><div><h4>Result, blockers, and audit events</h4>{activeExecution.resultSummary ? <p>{activeExecution.resultSummary}</p> : <p>Waiting for StarLord/Thor to run the copied packet outside the app and report the review result.</p>}<ul className="detail-list compact-list">{activeExecution.blockedReasons.map((item) => <li key={item}>{item}</li>)}</ul><ul className="detail-list compact-list">{activeExecution.events.map((event) => <li key={event.id}>{event.action} · {event.summary}</li>)}</ul></div></div> : <p>No Phase 9 execution record queued yet. Prepare the OpenClaw bridge, then queue review execution.</p>}
             {activeExecution ? <pre className="sdf-task-packet">{activeExecution.copyableCommand}</pre> : null}

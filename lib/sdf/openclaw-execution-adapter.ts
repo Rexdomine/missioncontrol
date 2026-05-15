@@ -95,6 +95,7 @@ export function buildOperatorExecutionRecord(item: OperatorBridgeOutboxItem, val
       liveExecutionBlocked: true,
       externalSideEffectsAllowed: false,
     },
+    submissionAttempts: [],
     events: [
       {
         id: generateId("operator-execution-event"),

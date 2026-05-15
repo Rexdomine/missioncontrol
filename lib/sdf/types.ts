@@ -59,7 +59,11 @@ export type AuditAction =
   | "operator.execution.completed-review"
   | "operator.execution.blocked"
   | "operator.execution.cancelled"
-  | "operator.execution.failed";
+  | "operator.execution.failed"
+  | "operator.session-submission.dry-run"
+  | "operator.session-submission.idempotent-hit"
+  | "operator.session-submission.blocked"
+  | "operator.session-submission.accepted";
 
 export type GeneratedTask = {
   id: string;
@@ -267,6 +271,97 @@ export type OperatorBridgeOutboxItem = {
   executionPacket: OperatorExecutionPacket;
 };
 
+export type OpenClawSessionsBridgeMode = "review";
+export type OpenClawSessionsBridgeSubmissionAction = "dry-run" | "submit";
+export type OpenClawSessionsBridgeIdempotencyStatus = "new" | "replayed";
+export type OpenClawSessionsBridgeNextAction = "copy-packet-manually" | "configure-bridge" | "fix-request" | "wait-for-session";
+
+export type OpenClawSessionsBridgeApprovalProof = {
+  approvalIntent: "rex-approved-review-dispatch";
+  approvedBy: "Rex" | "Thor" | "System";
+  approvedAt: string;
+  approvalNote?: string;
+};
+
+export type OpenClawSessionsBridgeAuditContext = {
+  runTitle: string;
+  source: "mission-control-sdf";
+  requestedBy: "Rex" | "Thor" | "System";
+  reason: string;
+};
+
+export type OpenClawSessionsBridgeRequest = {
+  schemaVersion: "mission-control.openclaw.sessions.review.v1";
+  runId: string;
+  executionId: string;
+  handoffId: string;
+  idempotencyKey: string;
+  target: {
+    targetId: string;
+    agentId: "thor" | string;
+    operator: "Thor" | "StarLord" | string;
+    mode: OpenClawSessionsBridgeMode;
+  };
+  taskPacket: OperatorExecutionPacket;
+  allowlistedRepoPath: string;
+  approvalProof: OpenClawSessionsBridgeApprovalProof;
+  auditContext: OpenClawSessionsBridgeAuditContext;
+  createdAt: string;
+  requestedBy: "Rex" | "Thor" | "System";
+};
+
+export type OpenClawSessionsBridgeResponse = {
+  schemaVersion: "mission-control.openclaw.sessions.review.v1";
+  accepted: boolean;
+  blocked: boolean;
+  sessionId?: string;
+  jobId?: string;
+  idempotencyStatus: OpenClawSessionsBridgeIdempotencyStatus;
+  blockerReasons: string[];
+  auditEventId: string;
+  nextAction: OpenClawSessionsBridgeNextAction;
+};
+
+export type OpenClawSessionsBridgeSubmissionAttempt = {
+  id: string;
+  action: OpenClawSessionsBridgeSubmissionAction;
+  idempotencyKey: string;
+  targetId: string;
+  operator: string;
+  agentId: string;
+  mode: OpenClawSessionsBridgeMode;
+  allowlistedRepoPath: string;
+  dryRun: boolean;
+  accepted: boolean;
+  blocked: boolean;
+  idempotencyStatus: OpenClawSessionsBridgeIdempotencyStatus;
+  blockerReasons: string[];
+  sessionId?: string;
+  jobId?: string;
+  auditEventId: string;
+  nextAction: OpenClawSessionsBridgeNextAction;
+  request: OpenClawSessionsBridgeRequest;
+  response: OpenClawSessionsBridgeResponse;
+  createdAt: string;
+  requestedBy: "Rex" | "Thor" | "System";
+};
+
+export type OpenClawSessionsBridgeReadiness = {
+  bridge: "openclaw-sessions-review-bridge";
+  status: "disabled" | "missing-config" | "adapter-unavailable" | "ready";
+  enabled: boolean;
+  endpointConfigured: boolean;
+  tokenConfigured: boolean;
+  contractVersionConfigured: boolean;
+  liveSubmissionReady: boolean;
+  dryRunAvailable: true;
+  reviewModeOnly: true;
+  allowlistedTargets: Array<{ targetId: string; agentId: string; operator: string; repoPath: string; mode: OpenClawSessionsBridgeMode }>;
+  summary: string;
+  blockers: string[];
+  requiredEnv: string[];
+};
+
 export type OperatorExecutionRecord = {
   id: string;
   bridgeItemId: string;
@@ -292,6 +387,7 @@ export type OperatorExecutionRecord = {
   resultSummary?: string;
   blockedReasons: string[];
   auditMetadata: Record<string, string | number | boolean | null>;
+  submissionAttempts: OpenClawSessionsBridgeSubmissionAttempt[];
   events: Array<{
     id: string;
     action: OperatorExecutionAction;
@@ -355,4 +451,5 @@ export type SdfRunRegistryResponse = {
     summary: string;
     blockers: string[];
   };
+  sessionsBridge: OpenClawSessionsBridgeReadiness;
 };

@@ -179,11 +179,11 @@ export function buildPrCheckpoint(intake: BuildIntake) {
   };
 }
 
-export function appendAudit(run: FactoryRun, event: Omit<SdfAuditEvent, "id" | "createdAt">): FactoryRun {
+export function appendAudit(run: FactoryRun, event: Omit<SdfAuditEvent, "id" | "createdAt"> & { id?: string }): FactoryRun {
   return {
     ...run,
     auditTrail: [
-      { id: generateId("audit"), createdAt: nowIso(), ...event },
+      { ...event, id: event.id ?? generateId("audit"), createdAt: nowIso() },
       ...(run.auditTrail ?? []),
     ],
   };
