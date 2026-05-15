@@ -86,3 +86,15 @@ Security notes:
 ## Notes
 
 Phase 1 of the Agent OS is intentionally frontend-first. It establishes the operating model, typed seed data, and reviewable UI surfaces before replacing the static data with real telemetry from sessions, commands, memory, tools, GitHub, and scheduler state.
+
+## Software Development Factory Phase 4
+
+SDF Phase 4 adds the first server-side integration foundations for `/sdf`:
+
+- typed API-backed factory run registry under `/api/sdf/runs`
+- safe local file persistence at `.mission-control-data/sdf/runs.json` (ignored)
+- GitHub checkpoint sync model with `live`, `manual`, and `simulated` sources
+- gated Thor/helper launch request packets with Rex approval state
+- non-secret audit events for run updates, sync attempts, launch requests, and approval changes
+
+No live external actions are triggered from the UI in this phase. GitHub live sync requires server-only `GITHUB_TOKEN` and `GITHUB_REPOSITORY`; without them, the app records manual/simulated status and an explicit blocker. See `docs/sdf-phase4.md` for adapter boundaries and Phase 5 live orchestration notes.

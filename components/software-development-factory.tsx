@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { appTypeTemplates, buildReadiness, buildTaskPacket, defaultIntake, generateTaskGraph } from "@/lib/sdf/factory";
+import type { BuildIntake, FactoryModeName, FactoryRun, FactoryRunState, SdfRunRegistryResponse } from "@/lib/sdf/types";
 import type {
   SdfAgentLane,
   SdfFactoryMode,
@@ -11,73 +13,7 @@ import type {
 } from "./mission-control-data";
 import { SectionHeader } from "./mission-control-sections";
 
-type FactoryModeName = SdfFactoryMode["name"];
-
-type BuildIntake = {
-  appName: string;
-  productGoal: string;
-  mode: FactoryModeName;
-  appType: string;
-  repoDetails: string;
-  designAssets: string;
-  requiredFeatures: string;
-  constraints: string;
-  rexProvides: string;
-};
-
-type FactoryRunState = "Draft" | "Ready to launch" | "Running" | "Blocked" | "Review ready" | "PR open" | "Done";
-type GeneratedTaskStatus = "Ready" | "Input needed" | "Queued" | "Gate pending" | "Running" | "Done";
-type TimelineStatus = "Planned" | "Active" | "Blocked" | "Complete" | "Review";
-type CheckStatus = "Simulated" | "Pending" | "Passing" | "Failing" | "Not connected";
-type ReviewState = "Not requested" | "Needs Rex" | "Changes requested" | "Approved";
-
-type GeneratedTask = {
-  id: string;
-  phase: string;
-  title: string;
-  owner: string;
-  status: GeneratedTaskStatus;
-  dependencies: string[];
-  acceptance: string[];
-  qualityGates: string[];
-  rexInputPoint: string;
-  checkpoint: string;
-  verificationCommands: string[];
-};
-
-type ExecutionEvent = {
-  id: string;
-  label: string;
-  actor: string;
-  status: TimelineStatus;
-  detail: string;
-  timestamp: string;
-};
-
-type PullRequestCheckpoint = {
-  prUrl: string;
-  branch: string;
-  commit: string;
-  checkStatus: CheckStatus;
-  reviewState: ReviewState;
-  risks: string[];
-  blockers: string[];
-  nextAction: string;
-  liveSync: boolean;
-};
-
-type FactoryRun = {
-  id: string;
-  title: string;
-  state: FactoryRunState;
-  createdAt: string;
-  updatedAt: string;
-  intake: BuildIntake;
-  tasks: GeneratedTask[];
-  timeline: ExecutionEvent[];
-  prCheckpoint: PullRequestCheckpoint;
-  readiness: Array<{ id: string; label: string; complete: boolean; detail: string }>;
-};
+const STORAGE_KEY = "mission-control:sdf:factory-runs:v1";
 
 type ReviewCheckpoint = {
   label: string;
@@ -85,221 +21,29 @@ type ReviewCheckpoint = {
   detail: string;
 };
 
-const STORAGE_KEY = "mission-control:sdf:factory-runs:v1";
-
-const defaultIntake: BuildIntake = {
-  appName: "Mission Control SDF Phase 3",
-  productGoal:
-    "Turn the SDF planning surface into a saved factory-run control layer with launch readiness, Thor/helper task packets, execution timeline, and PR checkpoints.",
-  mode: "Factory",
-  appType: "Next.js product dashboard",
-  repoDetails: "missioncontrol · /sdf route · fresh branch from origin/main",
-  designAssets:
-    "Use the existing Mission Control warm dashboard system; attach screenshots, copy docs, Figma links, or HTML exports when available.",
-  requiredFeatures:
-    "Saved run registry, selected run detail view, readiness checklist, task packets, execution timeline, PR/checkpoint tracker, Rex approval gates.",
-  constraints:
-    "No unsafe external actions from the web app. Live agent spawning and GitHub sync stay gated until a safe backend integration exists.",
-  rexProvides:
-    "Approval to launch, priority lane, final acceptance criteria, permission before live external actions, review decision on the PR checkpoint.",
-};
-
-const appTypeTemplates = [
-  "Next.js product dashboard",
-  "Marketing/landing page",
-  "Internal admin tool",
-  "SaaS app workflow",
-  "API-backed feature",
-];
-
-const basePhaseBlueprint = [
-  {
-    phase: "01 · Intake",
-    title: "Normalize build brief and source context",
-    owner: "Thor Lead Engineer",
-    dependencies: ["Project/app name", "Product goal", "Repo/source details"],
-    acceptance: ["Scope is explicit", "Out-of-scope work is named", "Rex input list is visible"],
-    qualityGates: ["Brief", "Self-check"],
-    checkpoint: "Intake packet ready for Rex to approve or revise.",
-  },
-  {
-    phase: "02 · Design and UX plan",
-    title: "Translate frontend assets into implementation-ready UI requirements",
-    owner: "Frontend Builder",
-    dependencies: ["Design notes/assets", "App type/template"],
-    acceptance: ["Responsive states are named", "Empty/loading/error states are covered", "Accessibility labels are planned"],
-    qualityGates: ["Implementation", "Integration"],
-    checkpoint: "Design intake confirms what Thor should build first.",
-  },
-  {
-    phase: "03 · Architecture and data model",
-    title: "Define typed seams before implementation",
-    owner: "Backend Builder",
-    dependencies: ["Required phases/features", "Constraints/risks"],
-    acceptance: ["Source of truth is clear", "Persistence seam is future-safe", "No speculative backend is required"],
-    qualityGates: ["Self-check", "Review"],
-    checkpoint: "Persistence and orchestration extension points are documented without overbuilding.",
-  },
-  {
-    phase: "04 · Build slice",
-    title: "Implement the smallest reviewable product surface",
-    owner: "Thor Lead Engineer",
-    dependencies: ["Approved task graph", "Lane assignments"],
-    acceptance: ["Route works locally", "Navigation remains intact", "Copy explains current limitations"],
-    qualityGates: ["Implementation", "Verification"],
-    checkpoint: "Working branch is ready for QA and reviewer pass.",
-  },
-  {
-    phase: "05 · QA and PR handoff",
-    title: "Package verification evidence for Rex review",
-    owner: "QA + Reviewer",
-    dependencies: ["Build slice", "Acceptance criteria", "Quality gates"],
-    acceptance: ["Lint/typecheck/build pass", "Route smoke covers /sdf and navigation", "PR summary is readable"],
-    qualityGates: ["Verification", "PR", "Rex review"],
-    checkpoint: "Rex gets an approve/revise/hold checkpoint with blockers called out.",
-  },
-];
-
 function statusTone(status: string) {
-  if (["Blocked", "Guarded", "Waiting", "Input needed", "Failing", "Changes requested", "Not connected"].includes(status)) return "risk";
-  if (["Active", "In progress", "Recommended", "Lead", "Ready", "Running", "Passing", "Approved", "Done", "Complete"].includes(status)) return "active";
+  if (["Blocked", "Guarded", "Waiting", "Input needed", "Failing", "Changes requested", "Not connected", "rejected"].includes(status)) return "risk";
+  if (["Active", "In progress", "Recommended", "Lead", "Ready", "Running", "Passing", "Approved", "Done", "Complete", "approved", "launched", "live"].includes(status)) return "active";
   return "warning";
-}
-
-function splitItems(value: string) {
-  return value
-    .split(/\n|,|;/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function nowIso() {
-  return new Date().toISOString();
 }
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
-function generateTaskGraph(intake: BuildIntake): GeneratedTask[] {
-  const features = splitItems(intake.requiredFeatures);
-  const risks = splitItems(intake.constraints);
-  const rexInputs = splitItems(intake.rexProvides);
-
-  return basePhaseBlueprint.map((phase, index) => {
-    const needsInput = index === 1 && !intake.designAssets.trim();
-    const constrained = index === 2 && risks.length > 0;
-    const dependencyFeature = features[index % Math.max(features.length, 1)];
-    const rexInput = rexInputs[index % Math.max(rexInputs.length, 1)];
-
-    return {
-      id: `generated-${index + 1}`,
-      ...phase,
-      title: index === 0 ? `Normalize ${intake.appName || "new build"} brief and source context` : phase.title,
-      status: needsInput ? "Input needed" : constrained ? "Gate pending" : index < 2 ? "Ready" : "Queued",
-      dependencies: [
-        ...phase.dependencies,
-        dependencyFeature ? `Feature focus: ${dependencyFeature}` : `Template: ${intake.appType}`,
-      ],
-      acceptance: [
-        ...phase.acceptance,
-        intake.mode === "Autopilot" ? "Approval boundaries are explicit before execution" : `${intake.mode} mode responsibilities are clear`,
-      ],
-      rexInputPoint: rexInput || "Confirm scope and review checkpoint before expansion.",
-      verificationCommands: index === 4 ? ["npm run lint", "npm run typecheck", "npm run build", "git diff --check"] : ["self-check", "acceptance review"],
-    };
-  });
-}
-
-function buildReadiness(intake: BuildIntake) {
-  const hasDesign = Boolean(intake.designAssets.trim());
-  const hasRepo = Boolean(intake.repoDetails.trim());
-  const hasRexGate = Boolean(intake.rexProvides.trim());
-  const hasScope = Boolean(intake.productGoal.trim() && intake.requiredFeatures.trim());
-
-  return [
-    { id: "scope", label: "Scope and acceptance criteria captured", complete: hasScope, detail: hasScope ? "Goal and feature list are present." : "Add product goal and required features." },
-    { id: "source", label: "Repo/source lane identified", complete: hasRepo, detail: hasRepo ? intake.repoDetails : "Add repo, branch, or source details before assigning Thor." },
-    { id: "assets", label: "Design/input assets attached or intentionally omitted", complete: hasDesign, detail: hasDesign ? "Frontend lane has visual/source context." : "Add design links or mark design as open for Thor to derive." },
-    { id: "approval", label: "Rex approval boundary named", complete: hasRexGate, detail: hasRexGate ? "External actions remain gated by Rex review." : "Name what Rex must approve before launch." },
-  ];
-}
-
-function buildTimeline(tasks: GeneratedTask[]): ExecutionEvent[] {
-  return tasks.map((task, index) => ({
-    id: `timeline-${task.id}`,
-    label: task.phase,
-    actor: task.owner,
-    status: index === 0 ? "Active" : task.status === "Input needed" ? "Blocked" : "Planned",
-    detail: task.checkpoint,
-    timestamp: nowIso(),
-  }));
-}
-
-function buildPrCheckpoint(intake: BuildIntake): PullRequestCheckpoint {
-  const branchSlug = intake.appName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "factory-run";
-  return {
-    prUrl: "",
-    branch: `feat/${branchSlug}`,
-    commit: "pending",
-    checkStatus: "Simulated",
-    reviewState: "Needs Rex",
-    risks: splitItems(intake.constraints).slice(0, 3),
-    blockers: buildReadiness(intake).filter((item) => !item.complete).map((item) => item.label),
-    nextAction: "Rex reviews the generated packet, then Thor opens a real branch/PR outside the web app.",
-    liveSync: false,
-  };
-}
-
-function createRun(intake: BuildIntake, state: FactoryRunState = "Draft"): FactoryRun {
-  const tasks = generateTaskGraph(intake);
-  const createdAt = nowIso();
-  return {
-    id: `run-${Date.now()}`,
-    title: intake.appName || "Untitled factory run",
-    state,
-    createdAt,
-    updatedAt: createdAt,
-    intake,
-    tasks,
-    timeline: buildTimeline(tasks),
-    prCheckpoint: buildPrCheckpoint(intake),
-    readiness: buildReadiness(intake),
-  };
-}
-
-function createSeedRuns(): FactoryRun[] {
-  const readyRun = createRun(defaultIntake, "Ready to launch");
-  return [
-    {
-      ...readyRun,
-      id: "seed-sdf-phase3",
-      createdAt: "2026-05-15T07:00:00.000Z",
-      updatedAt: "2026-05-15T07:00:00.000Z",
-      prCheckpoint: {
-        ...readyRun.prCheckpoint,
-        branch: "feat/sdf-phase3-factory-runs",
-        checkStatus: "Simulated",
-        reviewState: "Needs Rex",
-        nextAction: "Copy the Thor task packet after Rex confirms launch readiness.",
-      },
-    },
-  ];
-}
-
-function loadRuns(): FactoryRun[] {
-  if (typeof window === "undefined") return createSeedRuns();
+function loadLocalFallback(): FactoryRun[] {
+  if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return createSeedRuns();
+    if (!raw) return [];
     const parsed = JSON.parse(raw) as FactoryRun[];
-    return Array.isArray(parsed) && parsed.length ? parsed : createSeedRuns();
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return createSeedRuns();
+    return [];
   }
 }
 
-function buildReviewCheckpoints(intake: BuildIntake, tasks: GeneratedTask[]): ReviewCheckpoint[] {
+function buildReviewCheckpoints(intake: BuildIntake, tasks: ReturnType<typeof generateTaskGraph>): ReviewCheckpoint[] {
   const readiness = buildReadiness(intake);
   const incomplete = readiness.filter((item) => !item.complete).length;
   const blockedTasks = tasks.filter((task) => task.status === "Input needed").length;
@@ -313,29 +57,19 @@ function buildReviewCheckpoints(intake: BuildIntake, tasks: GeneratedTask[]): Re
     {
       label: "Execution safety",
       state: "Review",
-      detail: "The web app prepares task packets only. Real agent spawning and GitHub writes require an approved backend integration.",
+      detail: "The web app prepares and records launch packets only. Real agent spawning remains behind Rex approval and a future safe backend adapter.",
     },
     {
       label: "Blocked",
       state: blockedTasks ? "Blocked" : "Ready",
-      detail: blockedTasks ? `${blockedTasks} generated task needs input before launch.` : "No hard blocker in the saved local run model.",
+      detail: blockedTasks ? `${blockedTasks} generated task needs input before launch.` : "No hard blocker in the API-backed run model.",
     },
     {
       label: "Approval/review",
       state: intake.mode === "Autopilot" ? "Review" : "Ready",
-      detail: "Rex approval remains the gate before any external action, branch push, PR open, or live helper-agent launch.",
+      detail: "Rex approval is logged before any future external action, branch push, PR open, or live helper-agent launch.",
     },
   ];
-}
-
-function buildTaskPacket(run: FactoryRun) {
-  const taskLines = run.tasks
-    .map(
-      (task) => `### ${task.phase} — ${task.title}\nOwner/lane: ${task.owner}\nStatus: ${task.status}\nDependencies:\n${task.dependencies.map((item) => `- ${item}`).join("\n")}\nAcceptance criteria:\n${task.acceptance.map((item) => `- ${item}`).join("\n")}\nVerification: ${task.verificationCommands.join(" · ")}\nRex input: ${task.rexInputPoint}\nExpected checkpoint: ${task.checkpoint}`,
-    )
-    .join("\n\n");
-
-  return `You are Thor/helper agent executing a Mission Control SDF factory run.\n\nRun: ${run.title}\nState: ${run.state}\nMode: ${run.intake.mode}\nRepo/source: ${run.intake.repoDetails}\nProduct goal: ${run.intake.productGoal}\n\nGlobal constraints:\n- Do not perform external writes without Rex approval.\n- Keep changes reviewable and open a PR instead of merging.\n- Report branch, commit, verification, blockers, and PR/checkpoint state.\n\n${taskLines}\n\nPR/checkpoint output expected:\n- Branch: ${run.prCheckpoint.branch}\n- PR URL: ${run.prCheckpoint.prUrl || "pending"}\n- Commit: ${run.prCheckpoint.commit}\n- Checks: ${run.prCheckpoint.checkStatus}\n- Review state: ${run.prCheckpoint.reviewState}\n- Next action: ${run.prCheckpoint.nextAction}`;
 }
 
 function FieldGroup({
@@ -365,10 +99,10 @@ function FieldGroup({
   );
 }
 
-function LocalPersistenceNotice() {
+function IntegrationNotice({ adapter, error }: { adapter: SdfRunRegistryResponse["adapter"] | null; error: string }) {
   return (
     <div className="sdf-notice" role="note">
-      <strong>Safe Phase 3 adapter:</strong> runs are saved in this browser with a typed localStorage adapter. Live database persistence, GitHub sync, and app-to-agent launch are intentionally gated extension points.
+      <strong>Phase 4 integration foundation:</strong> SDF now reads and writes runs through typed API routes backed by a safe server file adapter ({adapter?.source ?? "loading"}). Browser localStorage is retained only as a resilience fallback. {error ? `Current API issue: ${error}` : "GitHub sync and agent launch remain gated."}
     </div>
   );
 }
@@ -389,23 +123,39 @@ export function SoftwareDevelopmentFactoryModule({
   rexInputs: SdfRexInput[];
 }) {
   const [intake, setIntake] = useState<BuildIntake>(defaultIntake);
-  const [runs, setRuns] = useState<FactoryRun[]>(createSeedRuns);
-  const [selectedRunId, setSelectedRunId] = useState("seed-sdf-phase3");
+  const [runs, setRuns] = useState<FactoryRun[]>([]);
+  const [selectedRunId, setSelectedRunId] = useState("seed-sdf-phase4");
   const [copied, setCopied] = useState(false);
-  const [storageReady, setStorageReady] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [adapter, setAdapter] = useState<SdfRunRegistryResponse["adapter"] | null>(null);
 
-  useEffect(() => {
-    const loaded = loadRuns();
-    setRuns(loaded);
-    setSelectedRunId(loaded[0]?.id ?? "seed-sdf-phase3");
-    setStorageReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (storageReady && typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(runs));
+  async function loadRuns() {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/sdf/runs", { cache: "no-store" });
+      if (!response.ok) throw new Error(`API returned ${response.status}`);
+      const data = (await response.json()) as SdfRunRegistryResponse;
+      const nextRuns = data.runs.length ? data.runs : loadLocalFallback();
+      setRuns(nextRuns);
+      setAdapter(data.adapter);
+      setSelectedRunId((current) => (nextRuns.some((run) => run.id === current) ? current : nextRuns[0]?.id ?? ""));
+      if (typeof window !== "undefined") window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextRuns));
+    } catch (apiError) {
+      const fallback = loadLocalFallback();
+      setRuns(fallback);
+      setSelectedRunId(fallback[0]?.id ?? "");
+      setError(apiError instanceof Error ? apiError.message : "Unable to load SDF API registry");
+    } finally {
+      setLoading(false);
     }
-  }, [runs, storageReady]);
+  }
+
+  useEffect(() => {
+    void loadRuns();
+  }, []);
 
   const generatedTasks = useMemo(() => generateTaskGraph(intake), [intake]);
   const reviewCheckpoints = useMemo(() => buildReviewCheckpoints(intake, generatedTasks), [generatedTasks, intake]);
@@ -414,38 +164,92 @@ export function SoftwareDevelopmentFactoryModule({
   const readyRuns = runs.filter((run) => run.state === "Ready to launch" || run.state === "Running" || run.state === "PR open").length;
   const blockedRuns = runs.filter((run) => run.state === "Blocked" || run.readiness.some((item) => !item.complete)).length;
   const requiredGates = gates.filter((gate) => gate.status === "Required").length;
+  const latestLaunch = selectedRun?.launchRequests[0];
 
   function updateIntake(field: keyof BuildIntake, value: string) {
     setIntake((current) => ({ ...current, [field]: value }));
   }
 
-  function saveDraftRun() {
-    const run = createRun(intake, buildReadiness(intake).every((item) => item.complete) ? "Ready to launch" : "Draft");
-    setRuns((current) => [run, ...current]);
-    setSelectedRunId(run.id);
+  async function saveDraftRun() {
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/sdf/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(intake) });
+      if (!response.ok) throw new Error(`Create failed with ${response.status}`);
+      const run = (await response.json()) as FactoryRun;
+      setRuns((current) => [run, ...current]);
+      setSelectedRunId(run.id);
+    } catch (apiError) {
+      setError(apiError instanceof Error ? apiError.message : "Unable to save factory run");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function updateRunState(id: string, state: FactoryRunState) {
-    setRuns((current) =>
-      current.map((run) =>
-        run.id === id
-          ? {
-              ...run,
-              state,
-              updatedAt: nowIso(),
-              timeline: run.timeline.map((event, index) => ({
-                ...event,
-                status: state === "Done" ? "Complete" : state === "Blocked" && index === 0 ? "Blocked" : state === "Running" && index <= 1 ? "Active" : event.status,
-              })),
-              prCheckpoint: {
-                ...run.prCheckpoint,
-                checkStatus: state === "PR open" ? "Pending" : state === "Done" ? "Passing" : run.prCheckpoint.checkStatus,
-                reviewState: state === "Review ready" || state === "PR open" ? "Needs Rex" : state === "Done" ? "Approved" : run.prCheckpoint.reviewState,
-              },
-            }
-          : run,
-      ),
-    );
+  async function patchSelectedRun(patch: unknown) {
+    if (!selectedRun) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/sdf/runs/${selectedRun.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+      if (!response.ok) throw new Error(`Update failed with ${response.status}`);
+      const updated = (await response.json()) as FactoryRun;
+      setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
+    } catch (apiError) {
+      setError(apiError instanceof Error ? apiError.message : "Unable to update factory run");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function updateRunState(state: FactoryRunState) {
+    await patchSelectedRun({ state });
+  }
+
+  async function syncCheckpoint(source: "manual" | "simulated" | "live") {
+    if (!selectedRun) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/sdf/runs/${selectedRun.id}/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source,
+          branch: selectedRun.prCheckpoint.branch,
+          commit: selectedRun.prCheckpoint.commit === "pending" ? `manual-${Date.now().toString(36)}` : selectedRun.prCheckpoint.commit,
+          checkStatus: source === "simulated" ? "Simulated" : "Pending",
+          nextAction: source === "live" ? "Configure or verify GitHub credentials before trusting live status." : "Manual checkpoint recorded for Rex review.",
+        }),
+      });
+      if (!response.ok) throw new Error(`Sync failed with ${response.status}`);
+      const updated = (await response.json()) as FactoryRun;
+      setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
+    } catch (apiError) {
+      setError(apiError instanceof Error ? apiError.message : "Unable to sync checkpoint");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function prepareLaunchRequest(approvalState: "requested" | "approved" = "requested") {
+    if (!selectedRun) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/sdf/runs/${selectedRun.id}/launch-requests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approvalState, approvalNote: approvalState === "approved" ? "Rex approval state recorded; Phase 4 still does not spawn real agents." : undefined }),
+      });
+      if (!response.ok) throw new Error(`Launch request failed with ${response.status}`);
+      const updated = (await response.json()) as FactoryRun;
+      setRuns((current) => current.map((run) => (run.id === updated.id ? updated : run)));
+    } catch (apiError) {
+      setError(apiError instanceof Error ? apiError.message : "Unable to prepare launch request");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function copyPacket() {
@@ -460,21 +264,21 @@ export function SoftwareDevelopmentFactoryModule({
       <div className="primary-column">
         <article className="panel-card accent-card sdf-intro-panel">
           <SectionHeader
-            detail="Phase 3 turns SDF into a saved run registry and execution control surface. It prepares real task packets and checkpoints while keeping live external actions gated for Rex approval."
-            eyebrow="Phase 3 · Factory run control layer"
-            title="Launch and track development factory runs safely."
+            detail="Phase 4 moves SDF to server/API-backed runs, checkpoint sync foundations, launch request approvals, and a non-secret audit trail while keeping real external actions gated."
+            eyebrow="Phase 4 · Integration foundations"
+            title="Operate development factory runs from a safer server boundary."
           />
           <div className="sdf-model-grid">
-            <div><span>1</span><h3>Save runs</h3><p>Create persistent local factory runs with readiness, state, and selected-run detail.</p></div>
-            <div><span>2</span><h3>Prepare packets</h3><p>Generate Thor/helper instructions with lanes, dependencies, acceptance criteria, and verification.</p></div>
-            <div><span>3</span><h3>Track checkpoints</h3><p>Follow execution timeline, PR branch/commit/check state, blockers, and Rex review gates.</p></div>
+            <div><span>1</span><h3>API registry</h3><p>Save, update, and read factory runs through typed SDF API routes with file-backed local development persistence.</p></div>
+            <div><span>2</span><h3>Sync checkpoints</h3><p>Show live/manual/simulated GitHub status fields without unsafe browser-side tokens or writes.</p></div>
+            <div><span>3</span><h3>Gate launches</h3><p>Prepare Thor/helper packets and log Rex approval state before any future real agent launch adapter runs.</p></div>
           </div>
-          <LocalPersistenceNotice />
+          <IntegrationNotice adapter={adapter} error={error} />
         </article>
 
         <article className="panel-card sdf-intake-card" aria-labelledby="new-factory-run-heading">
           <SectionHeader
-            detail="Saving creates a run in the registry below. The app prepares launch materials, but it does not spawn agents or push branches from the browser."
+            detail="Saving creates a server-backed run in the registry below. The app prepares launch materials, but it does not spawn agents or mutate GitHub from the UI."
             eyebrow="Create run"
             title="New factory run intake"
           />
@@ -491,23 +295,23 @@ export function SoftwareDevelopmentFactoryModule({
             <FieldGroup id="rexProvides" label="What Rex needs to provide/approve" multiline onChange={updateIntake} value={intake.rexProvides} />
           </div>
           <div className="sdf-run-summary" aria-live="polite">
-            <div><strong>{runs.length}</strong><span>saved runs</span></div>
+            <div><strong>{loading ? "…" : runs.length}</strong><span>API-backed runs</span></div>
             <div><strong>{readyRuns}</strong><span>launch-ready/running</span></div>
             <div><strong>{blockedRuns}</strong><span>blocked or incomplete</span></div>
             <div><strong>{requiredGates}</strong><span>required gates</span></div>
           </div>
-          <div className="sdf-actions"><button className="primary-action" onClick={saveDraftRun} type="button">Save factory run</button></div>
+          <div className="sdf-actions"><button className="primary-action" disabled={saving} onClick={saveDraftRun} type="button">{saving ? "Saving…" : "Save factory run"}</button></div>
         </article>
 
         <article className="panel-card">
-          <SectionHeader detail="Select a run to see launch readiness, generated task packets, execution timeline, and PR checkpoint status." eyebrow="Run registry" title="Saved factory runs" />
-          <div className="sdf-run-registry">
-            {runs.map((run) => (
+          <SectionHeader detail="Select a run to see launch readiness, generated task packets, execution timeline, PR checkpoint status, approvals, and audit trail." eyebrow="Run registry" title="API-backed factory runs" />
+          <div className="sdf-run-registry" aria-busy={loading}>
+            {runs.length ? runs.map((run) => (
               <button aria-pressed={selectedRun?.id === run.id} className={`sdf-run-row${selectedRun?.id === run.id ? " selected" : ""}`} key={run.id} onClick={() => setSelectedRunId(run.id)} type="button">
-                <div><p className="project-priority">Updated {formatDate(run.updatedAt)} · {run.intake.mode}</p><h3>{run.title}</h3><p>{run.intake.productGoal}</p></div>
+                <div><p className="project-priority">Updated {formatDate(run.updatedAt)} · {run.intake.mode} · {run.prCheckpoint.syncSource}</p><h3>{run.title}</h3><p>{run.intake.productGoal}</p></div>
                 <span className={`status-pill ${statusTone(run.state)}`}>{run.state}</span>
               </button>
-            ))}
+            )) : <p>{loading ? "Loading SDF runs…" : "No factory runs found. Create one to seed the API registry."}</p>}
           </div>
         </article>
 
@@ -516,7 +320,7 @@ export function SoftwareDevelopmentFactoryModule({
             <SectionHeader detail="This is the operational view Rex uses before a real Thor/helper launch." eyebrow="Selected run detail" title={selectedRun.title} />
             <div className="sdf-detail-toolbar" aria-label="Factory run state controls">
               {(["Draft", "Ready to launch", "Running", "Blocked", "Review ready", "PR open", "Done"] as FactoryRunState[]).map((state) => (
-                <button className={selectedRun.state === state ? "selected" : ""} key={state} onClick={() => updateRunState(selectedRun.id, state)} type="button">{state}</button>
+                <button className={selectedRun.state === state ? "selected" : ""} disabled={saving} key={state} onClick={() => updateRunState(state)} type="button">{state}</button>
               ))}
             </div>
             <div className="sdf-detail-grid">
@@ -538,15 +342,17 @@ export function SoftwareDevelopmentFactoryModule({
 
         {selectedRun ? (
           <article className="panel-card">
-            <SectionHeader detail="Copy this packet into Thor/helper agent work. It includes lane assignment, acceptance criteria, dependencies, verification commands, PR output, and Rex input requirements." eyebrow="Agent orchestration hooks" title="Generated Thor/helper task packet" />
-            <div className="sdf-packet-toolbar"><button className="primary-action" onClick={copyPacket} type="button">{copied ? "Copied" : "Copy task packet"}</button><span>Live launch is gated until a safe app-to-agent backend exists.</span></div>
+            <SectionHeader detail="Prepare this packet for Thor/helper work. Phase 4 records approval/request state only; it never starts live external agents from the UI." eyebrow="Gated launch workflow" title="Prepared Thor/helper launch request" />
+            <div className="sdf-packet-toolbar"><button className="primary-action" onClick={copyPacket} type="button">{copied ? "Copied" : "Copy task packet"}</button><button disabled={saving} onClick={() => prepareLaunchRequest()} type="button">Prepare launch request</button><button disabled={saving} onClick={() => prepareLaunchRequest("approved")} type="button">Record Rex approval</button><span>Real launch remains blocked until Phase 5 connects a safe app-to-agent backend.</span></div>
+            {latestLaunch ? <div className="sdf-pr-grid"><div><span>Approval state</span><strong>{latestLaunch.approvalState}</strong></div><div><span>Launch ready</span><strong>{latestLaunch.launchReady ? "Yes" : "No"}</strong></div><div><span>Prepared</span><strong>{formatDate(latestLaunch.createdAt)}</strong></div><div><span>Next action</span><strong>{latestLaunch.nextAction}</strong></div></div> : <p>No launch request has been prepared for this run yet.</p>}
             <pre className="sdf-task-packet">{taskPacket}</pre>
           </article>
         ) : null}
 
         {selectedRun ? (
           <article className="panel-card">
-            <SectionHeader detail="These fields are modeled now with simulated state. Live GitHub sync is the next integration step once a safe backend token boundary exists." eyebrow="PR/checkpoint tracking" title="Branch, commit, checks, review, risks, and next action" />
+            <SectionHeader detail="GitHub status is modeled behind a server route. Live sync needs server credentials; manual/simulated data is safe for local development and review." eyebrow="GitHub checkpoint sync" title="Branch, commit, checks, review, blockers, and next action" />
+            <div className="sdf-packet-toolbar"><button disabled={saving} onClick={() => syncCheckpoint("manual")} type="button">Record manual check</button><button disabled={saving} onClick={() => syncCheckpoint("simulated")} type="button">Simulate sync</button><button disabled={saving} onClick={() => syncCheckpoint("live")} type="button">Try live sync boundary</button><span>Source: {selectedRun.prCheckpoint.syncSource} · last checked {formatDate(selectedRun.prCheckpoint.lastCheckedAt)}</span></div>
             <div className="sdf-pr-grid">
               <div><span>PR URL</span><strong>{selectedRun.prCheckpoint.prUrl || "Pending manual PR"}</strong></div>
               <div><span>Branch</span><strong>{selectedRun.prCheckpoint.branch}</strong></div>
@@ -558,6 +364,15 @@ export function SoftwareDevelopmentFactoryModule({
             <div className="sdf-task-body-grid">
               <div><h4>Risks/blockers</h4><ul className="detail-list compact-list">{[...selectedRun.prCheckpoint.risks, ...selectedRun.prCheckpoint.blockers].map((item) => <li key={item}>{item}</li>)}</ul></div>
               <div><h4>Next action</h4><p>{selectedRun.prCheckpoint.nextAction}</p></div>
+            </div>
+          </article>
+        ) : null}
+
+        {selectedRun ? (
+          <article className="panel-card">
+            <SectionHeader detail="Every persistence update, launch request, approval change, and checkpoint sync writes a non-secret audit event." eyebrow="Audit trail" title="Operational event log" />
+            <div className="sdf-timeline">
+              {selectedRun.auditTrail.length ? selectedRun.auditTrail.map((event) => <div className="sdf-timeline-item" key={event.id}><span className={`status-pill ${statusTone(event.action)}`}>{event.action}</span><div><strong>{event.summary}</strong><p>{event.actor} · {formatDate(event.createdAt)}</p></div></div>) : <p>No audit events yet.</p>}
             </div>
           </article>
         ) : null}
@@ -581,9 +396,9 @@ export function SoftwareDevelopmentFactoryModule({
         <article className="panel-card"><SectionHeader detail="Lane ownership is explicit before Thor asks any helper agent to build." eyebrow="Helper-agent assignment board" title="Factory lanes" /><div className="sdf-agent-board">{agents.map((agent) => <div className="sdf-agent-card" key={agent.id}><div className="skill-topline"><div><p className="project-priority">{agent.role}</p><h3>{agent.name}</h3></div><span className={`status-pill ${statusTone(agent.state)}`}>{agent.state}</span></div><p>{agent.handoff}</p></div>)}</div></article>
         <article className="panel-card accent-card"><SectionHeader detail="Rex should see the decision surface before live work starts." eyebrow="Rex checkpoint" title="Ready, needs input, blocked, approval" /><div className="sdf-checkpoint-list">{reviewCheckpoints.map((checkpoint) => <div className="sdf-checkpoint-card" key={checkpoint.label}><div className="control-card-head"><h3>{checkpoint.label}</h3><span className={`status-pill ${statusTone(checkpoint.state)}`}>{checkpoint.state}</span></div><p>{checkpoint.detail}</p></div>)}</div></article>
         <article className="panel-card control-panel"><SectionHeader detail="Every factory run should show what evidence exists before it asks Rex to trust the output." eyebrow="Quality gates" title="Checkpoint standards" /><div className="control-grid">{gates.map((gate) => <div className="control-card" key={gate.id}><div className="control-card-head"><h3>{gate.label}</h3><span className={`status-pill ${statusTone(gate.status)}`}>{gate.status}</span></div><p>{gate.evidence}</p></div>)}</div></article>
-        <article className="panel-card"><SectionHeader detail="The seeded SDF foundation remains visible so Rex can see how Phase 3 maps onto the factory model." eyebrow="Foundation pipeline" title="Factory stages already defined" /><div className="sdf-pipeline-rail">{pipeline.map((stage, index) => <div className="pipeline-step" key={stage.id}><span className="pipeline-index">{index + 1}</span><div><div className="pipeline-headline"><h3>{stage.label}</h3><span className={`status-pill ${statusTone(stage.status)}`}>{stage.status}</span></div><p>{stage.detail}</p><div className="thread-meta">Owner: {stage.owner}</div></div></div>)}</div></article>
-        <article className="panel-card"><SectionHeader detail="Seeded outputs keep the older SDF concept visible while Phase 3 adds saved operational runs." eyebrow="Seeded outputs" title="Existing phase tasks and Rex input queue" /><div className="sdf-task-list compact-sdf-list">{tasks.map((task) => <div className="ops-task-card" key={task.id}><div className="ops-task-topline"><div><p className="project-priority">{task.phase} · {task.owner}</p><h3>{task.title}</h3></div><span className={`status-pill ${statusTone(task.status)}`}>{task.status}</span></div></div>)}</div><div className="dispatch-list sdf-rex-input-list">{rexInputs.map((item) => <div className="dispatch-card" key={item.id}><p className="project-priority">{item.priority} · {item.neededFor}</p><h3>{item.title}</h3><p>{item.prompt}</p></div>)}</div></article>
-        <article className="panel-card sdf-readiness-card"><p className="eyebrow">Phase 4 live integrations</p><h2>Wire persistence, GitHub, and agent launch behind approved backends.</h2><p>Phase 3 deliberately models the operating layer first. Next: database-backed runs, GitHub check sync, and safe server-side launch workflows with Rex approval logging.</p></article>
+        <article className="panel-card"><SectionHeader detail="The seeded SDF foundation remains visible so Rex can see how Phase 4 maps onto the factory model." eyebrow="Foundation pipeline" title="Factory stages already defined" /><div className="sdf-pipeline-rail">{pipeline.map((stage, index) => <div className="pipeline-step" key={stage.id}><span className="pipeline-index">{index + 1}</span><div><div className="pipeline-headline"><h3>{stage.label}</h3><span className={`status-pill ${statusTone(stage.status)}`}>{stage.status}</span></div><p>{stage.detail}</p><div className="thread-meta">Owner: {stage.owner}</div></div></div>)}</div></article>
+        <article className="panel-card"><SectionHeader detail="Seeded outputs keep the older SDF concept visible while Phase 4 adds server-backed operations." eyebrow="Seeded outputs" title="Existing phase tasks and Rex input queue" /><div className="sdf-task-list compact-sdf-list">{tasks.map((task) => <div className="ops-task-card" key={task.id}><div className="ops-task-topline"><div><p className="project-priority">{task.phase} · {task.owner}</p><h3>{task.title}</h3></div><span className={`status-pill ${statusTone(task.status)}`}>{task.status}</span></div></div>)}</div><div className="dispatch-list sdf-rex-input-list">{rexInputs.map((item) => <div className="dispatch-card" key={item.id}><p className="project-priority">{item.priority} · {item.neededFor}</p><h3>{item.title}</h3><p>{item.prompt}</p></div>)}</div></article>
+        <article className="panel-card sdf-readiness-card"><p className="eyebrow">Phase 5 live orchestration</p><h2>Connect real GitHub and agent adapters only after credentials, approval policy, and execution backend are ready.</h2><p>Phase 4 creates the durable boundary: API routes, file adapter, env-documented live sync hook, prepared launch packet, Rex approval log, and audit history.</p></article>
       </div>
     </section>
   );
