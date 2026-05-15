@@ -61,11 +61,6 @@ Phase 5 should connect a real orchestration backend only after:
 3. Launch requests are idempotent and auditable.
 4. External writes have dry-run/review modes and clear rollback expectations.
 
-## Phase 5 recommendation
+## Phase 5 status
 
-Add a server-only orchestration adapter with separate capabilities for:
-
-- GitHub read-only PR/check status sync.
-- GitHub write actions only after Rex approval.
-- Agent launch request queueing with idempotency keys.
-- Audit export/search so Rex can review what happened before trusting automation.
+Phase 5 has been implemented as the live-orchestration safety layer. See `docs/sdf-phase5.md` for the current architecture, server-only read-only GitHub sync env vars, idempotent launch queue model, central approval policy, and Phase 6 dispatch path.

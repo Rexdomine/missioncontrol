@@ -19,7 +19,18 @@ export type CheckStatus = "Simulated" | "Pending" | "Passing" | "Failing" | "Not
 export type ReviewState = "Not requested" | "Needs Rex" | "Changes requested" | "Approved";
 export type SyncSource = "live" | "manual" | "simulated";
 export type LaunchApprovalState = "draft" | "requested" | "approved" | "rejected" | "launched";
-export type AuditAction = "run.created" | "run.updated" | "sync.requested" | "sync.updated" | "launch.prepared" | "approval.changed";
+export type LaunchQueueState = "queued" | "blocked" | "approved" | "dispatched-ready" | "cancelled" | "completed" | "failed";
+export type LiveAdapterStatus = "configured" | "not-configured" | "blocked";
+export type AuditAction =
+  | "run.created"
+  | "run.updated"
+  | "sync.requested"
+  | "sync.updated"
+  | "launch.prepared"
+  | "launch.queued"
+  | "launch.idempotent-hit"
+  | "approval.changed"
+  | "approval.policy.evaluated";
 
 export type GeneratedTask = {
   id: string;
@@ -44,6 +55,16 @@ export type ExecutionEvent = {
   timestamp: string;
 };
 
+export type GitHubLiveReadiness = {
+  status: LiveAdapterStatus;
+  configured: boolean;
+  repository: string;
+  tokenConfigured: boolean;
+  permissions: string;
+  blocker: string;
+  lastError: string;
+};
+
 export type PullRequestCheckpoint = {
   prUrl: string;
   branch: string;
@@ -56,6 +77,7 @@ export type PullRequestCheckpoint = {
   liveSync: boolean;
   syncSource: SyncSource;
   lastCheckedAt: string;
+  liveReadiness: GitHubLiveReadiness;
 };
 
 export type LaunchRequest = {
@@ -69,6 +91,32 @@ export type LaunchRequest = {
   updatedAt: string;
   launchReady: boolean;
   nextAction: string;
+};
+
+export type ApprovalPolicyStatus = {
+  state: "blocked" | "ready-for-approval" | "approved" | "dispatch-ready";
+  readyForDispatch: boolean;
+  canQueue: boolean;
+  canDispatchExternalWork: boolean;
+  reasons: string[];
+  requirements: Array<{ id: string; label: string; passed: boolean; detail: string }>;
+};
+
+export type LaunchQueueJob = {
+  id: string;
+  runId: string;
+  launchRequestId: string;
+  idempotencyKey: string;
+  state: LaunchQueueState;
+  requestedBy: "Rex" | "Thor" | "System";
+  packetHash: string;
+  approvalState: LaunchApprovalState;
+  approvalPolicy: ApprovalPolicyStatus;
+  createdAt: string;
+  updatedAt: string;
+  blockedReasons: string[];
+  dispatchAdapter: "none" | "safe-backend";
+  auditNote: string;
 };
 
 export type SdfAuditEvent = {
@@ -92,6 +140,8 @@ export type FactoryRun = {
   prCheckpoint: PullRequestCheckpoint;
   readiness: Array<{ id: string; label: string; complete: boolean; detail: string }>;
   launchRequests: LaunchRequest[];
+  launchQueue: LaunchQueueJob[];
+  approvalPolicy: ApprovalPolicyStatus;
   auditTrail: SdfAuditEvent[];
 };
 
