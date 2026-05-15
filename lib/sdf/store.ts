@@ -3,8 +3,9 @@ import path from "path";
 import { z } from "zod";
 import { appendAudit, buildReadiness, buildTaskPacket, buildTimeline, createLaunchRequest, createRun, createSeedRuns, defaultApprovalPolicy, defaultGitHubLiveReadiness, generateId, generateTaskGraph, nowIso } from "./factory";
 import { chooseLaunchQueueState, deriveLaunchIdempotencyKey, evaluateApprovalPolicy, stableHash } from "./approval-policy";
+import { buildDispatchPlan, createDispatchAttempt, findDispatchableJob, getDispatcherReadiness } from "./dispatcher";
 import { getGitHubLiveReadiness, readGitHubCheckpoint } from "./github";
-import type { BuildIntake, FactoryRun, FactoryRunState, LaunchApprovalState, LaunchQueueJob, SdfRunRegistryResponse } from "./types";
+import type { BuildIntake, DispatchAttempt, DispatchMode, FactoryRun, FactoryRunState, LaunchApprovalState, LaunchQueueJob, SdfRunRegistryResponse } from "./types";
 
 const dataDir = process.env.SDF_DATA_DIR || path.join(process.cwd(), ".mission-control-data", "sdf");
 const dataFile = path.join(dataDir, "runs.json");
@@ -23,6 +24,7 @@ const intakeSchema = z.object({
 
 const stateSchema = z.enum(["Draft", "Ready to launch", "Running", "Blocked", "Review ready", "PR open", "Done"]);
 const approvalSchema = z.enum(["draft", "requested", "approved", "rejected", "launched"]);
+const dispatchModeSchema = z.enum(["dry-run", "review", "live"]);
 
 async function ensureStore() {
   await fs.mkdir(dataDir, { recursive: true });
@@ -39,6 +41,7 @@ function normalizeRun(run: FactoryRun): FactoryRun {
     launchRequests: run.launchRequests ?? [],
     launchQueue: run.launchQueue ?? [],
     approvalPolicy: run.approvalPolicy ?? defaultApprovalPolicy,
+    dispatchAttempts: run.dispatchAttempts ?? [],
     auditTrail: run.auditTrail ?? [],
     prCheckpoint: {
       ...run.prCheckpoint,
@@ -46,6 +49,10 @@ function normalizeRun(run: FactoryRun): FactoryRun {
     },
   };
   return { ...withDefaults, approvalPolicy: evaluateApprovalPolicy(withDefaults) };
+}
+
+export function getSdfDispatcherReadiness() {
+  return getDispatcherReadiness();
 }
 
 async function readRunsUnsafe(): Promise<FactoryRun[]> {
@@ -72,7 +79,7 @@ export function getSdfAdapter(): SdfRunRegistryResponse["adapter"] {
 }
 
 export async function listRuns(): Promise<SdfRunRegistryResponse> {
-  return { runs: await readRunsUnsafe(), adapter: getSdfAdapter() };
+  return { runs: await readRunsUnsafe(), adapter: getSdfAdapter(), dispatcher: getDispatcherReadiness() };
 }
 
 export async function getRun(id: string): Promise<FactoryRun | null> {
@@ -254,4 +261,93 @@ export async function prepareLaunchRequest(id: string, body: unknown): Promise<F
   if (!updated) return null;
   await writeRuns(next);
   return normalizeRun(updated);
+}
+
+export async function dispatchLaunchJob(id: string, body: unknown): Promise<{ run: FactoryRun; dispatch: DispatchAttempt } | null> {
+  const parsed = z
+    .object({
+      mode: dispatchModeSchema.default("dry-run"),
+      dryRun: z.boolean().optional(),
+      reviewOnly: z.boolean().optional(),
+      intent: z.enum(["preview", "dry-run", "review", "live"]).default("preview"),
+      jobId: z.string().optional(),
+      requestedBy: z.enum(["Rex", "Thor", "System"]).default("System"),
+    })
+    .parse(body ?? {});
+
+  const explicitReviewIntent = parsed.dryRun === true || parsed.reviewOnly === true || parsed.intent === "preview" || parsed.intent === "dry-run" || parsed.intent === "review" || parsed.mode === "review" || parsed.mode === "dry-run";
+  const requestedMode: DispatchMode = parsed.intent === "live" ? "live" : parsed.mode;
+
+  const runs = await readRunsUnsafe();
+  let result: { run: FactoryRun; dispatch: DispatchAttempt } | null = null;
+  const next = runs.map((run) => {
+    if (run.id !== id) return run;
+    const job = findDispatchableJob(run, parsed.jobId);
+    const checkedRun = appendAudit(normalizeRun({ ...run, updatedAt: nowIso() }), {
+      action: "dispatch.adapter.checked",
+      actor: "System",
+      summary: "Dispatcher adapter readiness checked; all live write adapters remain disabled in Phase 6.",
+      metadata: { adapterCount: getDispatcherReadiness().adapters.length, liveExecutionEnabled: false },
+    });
+
+    if (!job) {
+      const syntheticJob: LaunchQueueJob = {
+        id: "missing-launch-job",
+        runId: run.id,
+        launchRequestId: "missing",
+        idempotencyKey: stableHash([run.id, "missing-launch-job"].join("|")),
+        state: "blocked",
+        requestedBy: "System",
+        packetHash: stableHash(buildTaskPacket(run)),
+        approvalState: "draft",
+        approvalPolicy: run.approvalPolicy,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+        blockedReasons: ["No launch queue job exists yet. Queue an approved launch request before dispatch review."],
+        dispatchAdapter: "none",
+        auditNote: "Dispatch preview blocked because no queue job exists.",
+      };
+      const blockedAttempt = createDispatchAttempt(checkedRun, syntheticJob, requestedMode, parsed.requestedBy);
+      const updated = appendAudit({ ...checkedRun, dispatchAttempts: [blockedAttempt, ...(checkedRun.dispatchAttempts ?? [])] }, {
+        action: "dispatch.blocked",
+        actor: "System",
+        summary: "Dispatch preview blocked because no launch queue job exists.",
+        metadata: { mode: requestedMode, runId: run.id },
+      });
+      result = { run: normalizeRun(updated), dispatch: blockedAttempt };
+      return result.run;
+    }
+
+    const previewPlan = buildDispatchPlan(checkedRun, job, requestedMode);
+    const existing = (checkedRun.dispatchAttempts ?? []).find((attempt) => attempt.idempotencyKey === previewPlan.idempotencyKey);
+    if (existing) {
+      const updated = appendAudit(checkedRun, {
+        action: "dispatch.previewed",
+        actor: "System",
+        summary: `Existing dispatch ${existing.outcome} record returned for idempotency key ${existing.idempotencyKey}.`,
+        metadata: { jobId: job.id, mode: requestedMode, idempotent: true, outcome: existing.outcome },
+      });
+      result = { run: normalizeRun(updated), dispatch: { ...existing, outcome: "idempotent-hit" } };
+      return result.run;
+    }
+
+    const attempt = createDispatchAttempt(checkedRun, job, requestedMode, parsed.requestedBy);
+    const action = requestedMode === "live" || !explicitReviewIntent || attempt.outcome === "blocked" ? "dispatch.blocked" : "dispatch.dry-run-approved";
+    const updated = appendAudit(
+      normalizeRun({ ...checkedRun, dispatchAttempts: [attempt, ...(checkedRun.dispatchAttempts ?? [])], updatedAt: nowIso() }),
+      {
+        action: action === "dispatch.blocked" && attempt.outcome === "blocked" && job.approvalState !== "approved" ? "dispatch.policy.failed" : action,
+        actor: "System",
+        summary: attempt.outcome === "planned" ? "Approved dry-run dispatch plan recorded; no external side effects occurred." : "Dispatch was blocked by Phase 6 safety policy; no external side effects occurred.",
+        metadata: { jobId: job.id, mode: requestedMode, outcome: attempt.outcome, explicitReviewIntent, liveExecutionBlocked: attempt.plan.liveExecutionBlocked },
+      },
+    );
+    result = { run: normalizeRun(updated), dispatch: attempt };
+    return result.run;
+  });
+
+  if (!result) return null;
+  await writeRuns(next);
+  const finalResult = result as { run: FactoryRun; dispatch: DispatchAttempt };
+  return { run: normalizeRun(finalResult.run), dispatch: finalResult.dispatch };
 }

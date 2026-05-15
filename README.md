@@ -87,6 +87,19 @@ Security notes:
 
 Phase 1 of the Agent OS is intentionally frontend-first. It establishes the operating model, typed seed data, and reviewable UI surfaces before replacing the static data with real telemetry from sessions, commands, memory, tools, GitHub, and scheduler state.
 
+## Software Development Factory Phase 6
+
+SDF Phase 6 adds the backend-only dispatcher review foundation for `/sdf`:
+
+- server-only dispatcher module at `lib/sdf/dispatcher.ts`
+- `POST /api/sdf/runs/[id]/dispatch` for explicit dry-run/review dispatch previews
+- idempotent dispatch attempts for approved launch queue jobs
+- least-privilege adapter capability matrix for Thor/helper launch, GitHub writes, and notifications
+- non-secret audit events for preview, blocked dispatch, approved dry-run, adapter checks, and policy failures
+- UI controls that show the latest dispatch plan, live blocker reasons, and why external writes remain disabled
+
+Phase 6 still performs no live external side effects by default. Agent spawning, GitHub mutations, outbound messages, and production writes remain blocked until Phase 7+ explicitly enables least-privilege adapters. See `docs/sdf-phase6.md` for the dispatcher architecture and live execution path.
+
 ## Software Development Factory Phase 5
 
 SDF Phase 5 adds the live-orchestration safety layer for `/sdf`:
@@ -99,4 +112,4 @@ SDF Phase 5 adds the live-orchestration safety layer for `/sdf`:
 - central approval policy covering Rex approval, launch packet, blockers, PR/check expectations, and adapter readiness
 - non-secret audit events for run updates, sync attempts, queue decisions, idempotent hits, and approval changes
 
-No external writes are triggered from the UI in this phase. GitHub writes, real agent dispatch, messages, production mutations, and PR actions remain blocked until an explicit Phase 6 backend adapter is implemented and Rex approval policy passes. See `docs/sdf-phase5.md` for environment variables, queue idempotency, approval policy, and the Phase 6 dispatch path.
+No external writes are triggered from the UI in this phase. GitHub writes, real agent dispatch, messages, production mutations, and PR actions remain blocked until explicit future backend adapters are implemented and Rex approval policy passes. See `docs/sdf-phase5.md` for environment variables, queue idempotency, approval policy, and the Phase 6 dispatch path.

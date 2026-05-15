@@ -21,6 +21,9 @@ export type SyncSource = "live" | "manual" | "simulated";
 export type LaunchApprovalState = "draft" | "requested" | "approved" | "rejected" | "launched";
 export type LaunchQueueState = "queued" | "blocked" | "approved" | "dispatched-ready" | "cancelled" | "completed" | "failed";
 export type LiveAdapterStatus = "configured" | "not-configured" | "blocked";
+export type DispatchMode = "dry-run" | "review" | "live";
+export type DispatchOutcome = "planned" | "blocked" | "idempotent-hit";
+export type DispatchAdapterKind = "thor-agent" | "github-write" | "notification";
 export type AuditAction =
   | "run.created"
   | "run.updated"
@@ -30,7 +33,12 @@ export type AuditAction =
   | "launch.queued"
   | "launch.idempotent-hit"
   | "approval.changed"
-  | "approval.policy.evaluated";
+  | "approval.policy.evaluated"
+  | "dispatch.previewed"
+  | "dispatch.blocked"
+  | "dispatch.dry-run-approved"
+  | "dispatch.adapter.checked"
+  | "dispatch.policy.failed";
 
 export type GeneratedTask = {
   id: string;
@@ -119,6 +127,57 @@ export type LaunchQueueJob = {
   auditNote: string;
 };
 
+export type DispatchAdapterCapability = {
+  kind: DispatchAdapterKind;
+  label: string;
+  status: LiveAdapterStatus;
+  readOnly: boolean;
+  writeEnabled: boolean;
+  requiresApproval: boolean;
+  supportsDryRun: boolean;
+  blocker: string;
+};
+
+export type DispatchPlanStep = {
+  id: string;
+  adapter: DispatchAdapterKind;
+  action: string;
+  dryRunOnly: boolean;
+  externalWrite: boolean;
+  approvalRequired: boolean;
+  status: "ready" | "blocked";
+  detail: string;
+};
+
+export type DispatchPlan = {
+  id: string;
+  runId: string;
+  jobId: string;
+  mode: DispatchMode;
+  idempotencyKey: string;
+  createdAt: string;
+  approvedForDryRun: boolean;
+  liveExecutionBlocked: boolean;
+  summary: string;
+  blockerReasons: string[];
+  adapters: DispatchAdapterCapability[];
+  steps: DispatchPlanStep[];
+};
+
+export type DispatchAttempt = {
+  id: string;
+  runId: string;
+  jobId: string;
+  mode: DispatchMode;
+  idempotencyKey: string;
+  outcome: DispatchOutcome;
+  plan: DispatchPlan;
+  requestedBy: "Rex" | "Thor" | "System";
+  createdAt: string;
+  updatedAt: string;
+  note: string;
+};
+
 export type SdfAuditEvent = {
   id: string;
   action: AuditAction;
@@ -142,6 +201,7 @@ export type FactoryRun = {
   launchRequests: LaunchRequest[];
   launchQueue: LaunchQueueJob[];
   approvalPolicy: ApprovalPolicyStatus;
+  dispatchAttempts: DispatchAttempt[];
   auditTrail: SdfAuditEvent[];
 };
 
@@ -152,5 +212,12 @@ export type SdfRunRegistryResponse = {
     source: string;
     primary: boolean;
     fallback: "localStorage";
+  };
+  dispatcher: {
+    status: "review-only";
+    defaultMode: "dry-run";
+    liveExecutionEnabled: boolean;
+    summary: string;
+    adapters: DispatchAdapterCapability[];
   };
 };

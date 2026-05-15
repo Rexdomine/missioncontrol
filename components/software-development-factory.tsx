@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { appTypeTemplates, buildReadiness, buildTaskPacket, defaultIntake, generateTaskGraph } from "@/lib/sdf/factory";
-import type { BuildIntake, FactoryModeName, FactoryRun, FactoryRunState, SdfRunRegistryResponse } from "@/lib/sdf/types";
+import type { BuildIntake, DispatchAttempt, FactoryModeName, FactoryRun, FactoryRunState, SdfRunRegistryResponse } from "@/lib/sdf/types";
 import type {
   SdfAgentLane,
   SdfFactoryMode,
@@ -102,7 +102,7 @@ function FieldGroup({
 function IntegrationNotice({ adapter, error }: { adapter: SdfRunRegistryResponse["adapter"] | null; error: string }) {
   return (
     <div className="sdf-notice" role="note">
-      <strong>Phase 5 live orchestration safety layer:</strong> SDF now reads and writes runs through typed API routes backed by a safe server file adapter ({adapter?.source ?? "loading"}), can attempt read-only GitHub PR/check sync from server env, and queues launch jobs idempotently behind approval policy. {error ? `Current API issue: ${error}` : "External writes and real agent dispatch remain blocked until explicit approval and a safe Phase 6 backend adapter exist."}
+      <strong>Phase 6 dispatcher safety layer:</strong> SDF now reads and writes runs through typed API routes backed by a safe server file adapter ({adapter?.source ?? "loading"}), can attempt read-only GitHub PR/check sync from server env, queues launch jobs idempotently behind approval policy, and previews dispatch plans in dry-run/review mode only. {error ? `Current API issue: ${error}` : "External writes and real agent dispatch remain blocked until explicit Phase 7 adapter approval."}
     </div>
   );
 }
@@ -130,6 +130,8 @@ export function SoftwareDevelopmentFactoryModule({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [adapter, setAdapter] = useState<SdfRunRegistryResponse["adapter"] | null>(null);
+  const [dispatcher, setDispatcher] = useState<SdfRunRegistryResponse["dispatcher"] | null>(null);
+  const [latestDispatch, setLatestDispatch] = useState<DispatchAttempt | null>(null);
 
   async function loadRuns() {
     setLoading(true);
@@ -141,6 +143,7 @@ export function SoftwareDevelopmentFactoryModule({
       const nextRuns = data.runs.length ? data.runs : loadLocalFallback();
       setRuns(nextRuns);
       setAdapter(data.adapter);
+      setDispatcher(data.dispatcher);
       setSelectedRunId((current) => (nextRuns.some((run) => run.id === current) ? current : nextRuns[0]?.id ?? ""));
       if (typeof window !== "undefined") window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextRuns));
     } catch (apiError) {
@@ -166,6 +169,7 @@ export function SoftwareDevelopmentFactoryModule({
   const requiredGates = gates.filter((gate) => gate.status === "Required").length;
   const latestLaunch = selectedRun?.launchRequests[0];
   const latestQueueJob = selectedRun?.launchQueue?.[0];
+  const latestRecordedDispatch = selectedRun?.dispatchAttempts?.[0];
 
   function updateIntake(field: keyof BuildIntake, value: string) {
     setIntake((current) => ({ ...current, [field]: value }));
@@ -253,6 +257,27 @@ export function SoftwareDevelopmentFactoryModule({
     }
   }
 
+  async function previewDispatch(mode: "dry-run" | "review" | "live" = "dry-run") {
+    if (!selectedRun) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/sdf/runs/${selectedRun.id}/dispatch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode, dryRun: mode !== "live", reviewOnly: mode !== "live", intent: mode === "live" ? "live" : "preview", jobId: latestQueueJob?.id }),
+      });
+      const payload = (await response.json()) as { run?: FactoryRun; dispatch?: DispatchAttempt; error?: string };
+      if (!response.ok && !payload.run) throw new Error(payload.error ?? `Dispatch preview failed with ${response.status}`);
+      if (payload.run) setRuns((current) => current.map((run) => (run.id === payload.run?.id ? payload.run : run)));
+      if (payload.dispatch) setLatestDispatch(payload.dispatch);
+    } catch (apiError) {
+      setError(apiError instanceof Error ? apiError.message : "Unable to preview dispatch");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function copyPacket() {
     if (!taskPacket || typeof navigator === "undefined") return;
     await navigator.clipboard.writeText(taskPacket);
@@ -265,14 +290,14 @@ export function SoftwareDevelopmentFactoryModule({
       <div className="primary-column">
         <article className="panel-card accent-card sdf-intro-panel">
           <SectionHeader
-            detail="Phase 5 turns the Phase 4 API foundation into a safer live-integration layer: read-only GitHub sync when configured, idempotent launch queueing, central approval policy, and audit-visible blockers."
-            eyebrow="Phase 5 · Live orchestration safety"
-            title="Queue real work safely before Phase 6 dispatch exists."
+            detail="Phase 6 adds a backend-only dispatcher foundation: read-only GitHub sync, idempotent launch queueing, central approval policy, dry-run dispatch plans, adapter readiness checks, and audit-visible blockers."
+            eyebrow="Phase 6 · Dispatcher review foundation"
+            title="Preview approved work safely before live dispatch exists."
           />
           <div className="sdf-model-grid">
             <div><span>1</span><h3>Read-only live sync</h3><p>Server-only GitHub adapter reads PR and check-run status when env is configured; otherwise manual/simulated fallback records blockers.</p></div>
             <div><span>2</span><h3>Idempotent queue</h3><p>Launch jobs are keyed by run, packet, approval state, and blocker acknowledgement so repeated requests return existing work.</p></div>
-            <div><span>3</span><h3>Approval policy</h3><p>Rex approval, launch packet, blocker state, PR expectations, and adapter readiness are evaluated before any external-write path.</p></div>
+            <div><span>3</span><h3>Dry-run dispatcher</h3><p>Approved queue jobs generate review plans, capability checks, blocker reasons, and audit events without spawning agents, mutating GitHub, or sending messages.</p></div>
           </div>
           <IntegrationNotice adapter={adapter} error={error} />
         </article>
@@ -343,11 +368,34 @@ export function SoftwareDevelopmentFactoryModule({
 
         {selectedRun ? (
           <article className="panel-card">
-            <SectionHeader detail="Prepare this packet for Thor/helper work. Phase 5 records an idempotent queue job and policy decision; it still never starts live external agents from the UI." eyebrow="Gated launch workflow" title="Prepared Thor/helper launch request" />
-            <div className="sdf-packet-toolbar"><button className="primary-action" onClick={copyPacket} type="button">{copied ? "Copied" : "Copy task packet"}</button><button disabled={saving} onClick={() => prepareLaunchRequest()} type="button">Queue launch job</button><button disabled={saving} onClick={() => prepareLaunchRequest("approved")} type="button">Record Rex approval + queue</button><span>Real dispatch remains blocked until Phase 6 connects a safe app-to-agent backend.</span></div>
+            <SectionHeader detail="Prepare this packet for Thor/helper work. Phase 6 records an idempotent queue job, policy decision, and dry-run dispatch preview; it still never starts live external agents from the UI." eyebrow="Gated launch workflow" title="Prepared Thor/helper launch request" />
+            <div className="sdf-packet-toolbar"><button className="primary-action" onClick={copyPacket} type="button">{copied ? "Copied" : "Copy task packet"}</button><button disabled={saving} onClick={() => prepareLaunchRequest()} type="button">Queue launch job</button><button disabled={saving} onClick={() => prepareLaunchRequest("approved")} type="button">Record Rex approval + queue</button><button disabled={saving || !latestQueueJob} onClick={() => previewDispatch("dry-run")} type="button">Preview dry-run dispatch</button><button disabled={saving || !latestQueueJob} onClick={() => previewDispatch("live")} type="button">Test live blocker</button><span>Real dispatch remains blocked until Phase 7 connects approved least-privilege adapters.</span></div>
             {latestLaunch ? <div className="sdf-pr-grid"><div><span>Approval state</span><strong>{latestLaunch.approvalState}</strong></div><div><span>Policy state</span><strong>{selectedRun.approvalPolicy.state}</strong></div><div><span>Launch ready</span><strong>{latestLaunch.launchReady ? "Yes" : "No"}</strong></div><div><span>Prepared</span><strong>{formatDate(latestLaunch.createdAt)}</strong></div><div><span>Next action</span><strong>{latestLaunch.nextAction}</strong></div></div> : <p>No launch request has been prepared for this run yet.</p>}
             {latestQueueJob ? <div className="sdf-task-body-grid"><div><h4>Latest queue job</h4><div className="sdf-pr-grid"><div><span>State</span><strong>{latestQueueJob.state}</strong></div><div><span>Idempotency key</span><strong>{latestQueueJob.idempotencyKey}</strong></div><div><span>Packet hash</span><strong>{latestQueueJob.packetHash}</strong></div><div><span>Dispatch adapter</span><strong>{latestQueueJob.dispatchAdapter}</strong></div></div></div><div><h4>Why blocked or ready</h4><ul className="detail-list compact-list">{(latestQueueJob.blockedReasons.length ? latestQueueJob.blockedReasons : [latestQueueJob.auditNote]).map((item) => <li key={item}>{item}</li>)}</ul></div></div> : null}
             <pre className="sdf-task-packet">{taskPacket}</pre>
+          </article>
+        ) : null}
+
+        {selectedRun ? (
+          <article className="panel-card">
+            <SectionHeader detail="The dispatcher records what would happen next, the adapter capabilities involved, and exactly why live side effects remain blocked." eyebrow="Phase 6 dispatcher" title="Dry-run dispatch plan and adapter readiness" />
+            <div className="sdf-pr-grid">
+              <div><span>Dispatcher status</span><strong>{dispatcher?.status ?? "review-only"}</strong></div>
+              <div><span>Default mode</span><strong>{dispatcher?.defaultMode ?? "dry-run"}</strong></div>
+              <div><span>Live execution</span><strong>{dispatcher?.liveExecutionEnabled ? "Enabled" : "Blocked"}</strong></div>
+              <div><span>Latest result</span><strong>{(latestDispatch ?? latestRecordedDispatch)?.outcome ?? "No dispatch preview yet"}</strong></div>
+            </div>
+            <p>{dispatcher?.summary ?? "Dispatcher readiness is loading; default behavior is dry-run/review only."}</p>
+            {(latestDispatch ?? latestRecordedDispatch) ? <div className="sdf-task-body-grid"><div><h4>Dispatch plan</h4><p>{(latestDispatch ?? latestRecordedDispatch)?.plan.summary}</p><ul className="detail-list compact-list">{((latestDispatch ?? latestRecordedDispatch)?.plan.steps ?? []).map((step) => <li key={step.id}>{step.action} — {step.detail}</li>)}</ul></div><div><h4>Blocker reasons</h4><ul className="detail-list compact-list">{((latestDispatch ?? latestRecordedDispatch)?.plan.blockerReasons.length ? (latestDispatch ?? latestRecordedDispatch)?.plan.blockerReasons : ["Dry-run preview is approved; live execution is still disabled by adapter policy."])?.map((item) => <li key={item}>{item}</li>)}</ul></div></div> : <p>No dispatch preview has been recorded. Queue an approved launch job, then preview dry-run dispatch.</p>}
+            <div className="sdf-generated-graph">
+              {(dispatcher?.adapters ?? []).map((capability) => (
+                <div className="sdf-generated-task" key={capability.kind}>
+                  <div className="pipeline-headline"><div><p className="project-priority">{capability.kind}</p><h3>{capability.label}</h3></div><span className={`status-pill ${statusTone(capability.status)}`}>{capability.status}</span></div>
+                  <div className="sdf-task-footer"><span>Read-only: {capability.readOnly ? "Yes" : "No"}</span><span>Write enabled: {capability.writeEnabled ? "Yes" : "No"}</span><span>Requires approval: {capability.requiresApproval ? "Yes" : "No"}</span><span>Dry-run: {capability.supportsDryRun ? "Supported" : "Unsupported"}</span></div>
+                  <p>{capability.blocker}</p>
+                </div>
+              ))}
+            </div>
           </article>
         ) : null}
 
