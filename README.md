@@ -87,6 +87,19 @@ Security notes:
 
 Phase 1 of the Agent OS is intentionally frontend-first. It establishes the operating model, typed seed data, and reviewable UI surfaces before replacing the static data with real telemetry from sessions, commands, memory, tools, GitHub, and scheduler state.
 
+## Software Development Factory Phase 9
+
+SDF Phase 9 connects the Phase 8 OpenClaw/operator outbox to a safe review-mode execution bridge:
+
+- typed `OperatorExecutionRecord` entries for prepared outbox items
+- server-only `openclaw-review-queue` adapter boundary at `lib/sdf/openclaw-execution-adapter.ts`
+- `POST /api/sdf/runs/[id]/operator-bridge/execute` for queue, start-review, complete-review, block, cancel, and fail lifecycle operations
+- explicit `approvalIntent: "rex-approved-review-dispatch"` plus `reviewOnly: true` before queueing execution
+- idempotent execution queueing keyed by run, bridge item, handoff, queue job, bridge idempotency key, and packet hash
+- UI controls for execution readiness, queued jobs, copyable operator command/packet, current state, result summary, blockers, and audit events
+
+Phase 9 is still review-mode only. Mission Control does not spawn OpenClaw sessions, run shell commands, mutate GitHub, send notifications, write production, or perform autonomous external side effects. If a direct OpenClaw execution env flag is requested, the adapter still blocks it until a secure in-app sessions API and explicit Rex approval exist. See `docs/sdf-phase9.md` for the execution lifecycle, adapter boundary, approval/idempotency rules, and Phase 10 path.
+
 ## Software Development Factory Phase 8
 
 SDF Phase 8 adds a safe OpenClaw/operator bridge outbox for approved `/sdf` handoff packets:

@@ -129,4 +129,4 @@ Enabled in Phase 8:
 
 ## Phase 9 path
 
-Phase 9 can add a real server bridge only after Rex approves the secure contract. That future bridge should still default to review mode, keep explicit approval and idempotency, use least-privilege credentials, and preserve the same outbox audit model before any live side-effect adapter is considered.
+Phase 9 now connects this outbox to a review-mode execution queue. It still does not directly run OpenClaw sessions from the app; it creates typed execution records and copyable operator packets/commands while preserving explicit approval, idempotency, and audit history. See `docs/sdf-phase9.md` for the current execution bridge and Phase 10 path toward a future approved secure sessions API.

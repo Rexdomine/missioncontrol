@@ -5,8 +5,9 @@ import { appendAudit, buildReadiness, buildTaskPacket, buildTimeline, createLaun
 import { chooseLaunchQueueState, deriveLaunchIdempotencyKey, evaluateApprovalPolicy, stableHash } from "./approval-policy";
 import { buildDispatchPlan, createDispatchAttempt, createThorReviewHandoff, findDispatchableJob, getDispatcherReadiness } from "./dispatcher";
 import { getGitHubLiveReadiness, readGitHubCheckpoint } from "./github";
+import { buildOperatorExecutionRecord, getOpenClawExecutionAdapterReadiness, transitionOperatorExecutionRecord } from "./openclaw-execution-adapter";
 import { buildOperatorBridgeOutboxItem, transitionOperatorBridgeItem } from "./operator-bridge";
-import type { BuildIntake, DispatchAttempt, DispatchMode, FactoryRun, FactoryRunState, LaunchApprovalState, LaunchQueueJob, OperatorBridgeAction, OperatorBridgeOutboxItem, SdfRunRegistryResponse } from "./types";
+import type { BuildIntake, DispatchAttempt, DispatchMode, FactoryRun, FactoryRunState, LaunchApprovalState, LaunchQueueJob, OperatorBridgeAction, OperatorBridgeOutboxItem, OperatorExecutionAction, OperatorExecutionRecord, SdfRunRegistryResponse } from "./types";
 
 const dataDir = process.env.SDF_DATA_DIR || path.join(process.cwd(), ".mission-control-data", "sdf");
 const dataFile = path.join(dataDir, "runs.json");
@@ -27,6 +28,7 @@ const stateSchema = z.enum(["Draft", "Ready to launch", "Running", "Blocked", "R
 const approvalSchema = z.enum(["draft", "requested", "approved", "rejected", "launched"]);
 const dispatchModeSchema = z.enum(["dry-run", "review", "review-dispatch", "operator-handoff", "live"]);
 const operatorBridgeActionSchema = z.enum(["prepare", "claim", "start-review", "complete-review", "block", "cancel", "fail"]);
+const operatorExecutionActionSchema = z.enum(["queue", "start-review", "complete-review", "block", "cancel", "fail"]);
 
 async function ensureStore() {
   await fs.mkdir(dataDir, { recursive: true });
@@ -45,6 +47,7 @@ function normalizeRun(run: FactoryRun): FactoryRun {
     approvalPolicy: run.approvalPolicy ?? defaultApprovalPolicy,
     dispatchAttempts: run.dispatchAttempts ?? [],
     operatorBridgeOutbox: run.operatorBridgeOutbox ?? [],
+    operatorExecutionRecords: run.operatorExecutionRecords ?? [],
     auditTrail: run.auditTrail ?? [],
     prCheckpoint: {
       ...run.prCheckpoint,
@@ -82,7 +85,7 @@ export function getSdfAdapter(): SdfRunRegistryResponse["adapter"] {
 }
 
 export async function listRuns(): Promise<SdfRunRegistryResponse> {
-  return { runs: await readRunsUnsafe(), adapter: getSdfAdapter(), dispatcher: getDispatcherReadiness() };
+  return { runs: await readRunsUnsafe(), adapter: getSdfAdapter(), dispatcher: getDispatcherReadiness(), executionAdapter: getOpenClawExecutionAdapterReadiness() };
 }
 
 export async function getRun(id: string): Promise<FactoryRun | null> {
@@ -494,6 +497,102 @@ export async function updateOperatorBridgeOutbox(id: string, body: unknown): Pro
       metadata: { bridgeItemId: transitioned.id, handoffId: transitioned.handoffId, state: transitioned.state, operator: transitioned.operator ?? null, externalSideEffectsAllowed: false },
     });
     result = { run: normalizeRun(updated), item: transitioned, idempotent: false };
+    return result.run;
+  });
+
+  if (!result) return null;
+  await writeRuns(next);
+  return result;
+}
+
+export async function updateOperatorExecutionRecord(id: string, body: unknown): Promise<{ run: FactoryRun; execution: OperatorExecutionRecord; idempotent: boolean; adapter: ReturnType<typeof getOpenClawExecutionAdapterReadiness> } | null> {
+  const parsed = z
+    .object({
+      action: operatorExecutionActionSchema.default("queue"),
+      approvalIntent: z.enum(["rex-approved-review-dispatch"]).optional(),
+      reviewOnly: z.boolean().default(true),
+      bridgeItemId: z.string().optional(),
+      handoffId: z.string().optional(),
+      executionId: z.string().optional(),
+      actor: z.enum(["Rex", "Thor", "System"]).default("System"),
+      operatorTarget: z.string().optional(),
+      resultSummary: z.string().optional(),
+      blockedReason: z.string().optional(),
+      liveExecutionRequested: z.boolean().default(false),
+    })
+    .parse(body ?? {});
+
+  const adapter = getOpenClawExecutionAdapterReadiness();
+  const runs = await readRunsUnsafe();
+  let result: { run: FactoryRun; execution: OperatorExecutionRecord; idempotent: boolean; adapter: ReturnType<typeof getOpenClawExecutionAdapterReadiness> } | null = null;
+
+  const next = runs.map((run) => {
+    if (run.id !== id) return run;
+    const checkedRun = normalizeRun({ ...run, updatedAt: nowIso() });
+    const action = parsed.action as OperatorExecutionAction;
+
+    if (parsed.liveExecutionRequested) {
+      throw new Error(adapter.summary);
+    }
+
+    if (action === "queue") {
+      if (parsed.approvalIntent !== "rex-approved-review-dispatch" || parsed.reviewOnly !== true) {
+        throw new Error("Execution queueing requires approvalIntent=rex-approved-review-dispatch and reviewOnly=true. Direct/live execution remains disabled.");
+      }
+      const item = (checkedRun.operatorBridgeOutbox ?? []).find((bridgeItem) => bridgeItem.id === parsed.bridgeItemId || bridgeItem.handoffId === parsed.handoffId) ?? checkedRun.operatorBridgeOutbox?.[0];
+      if (!item) {
+        throw new Error("No prepared OpenClaw/operator bridge item exists. Prepare the approved bridge outbox before queueing Phase 9 execution.");
+      }
+      const execution = buildOperatorExecutionRecord(item, { actor: parsed.actor, operatorTarget: parsed.operatorTarget, resultSummary: parsed.resultSummary });
+      const existing = (checkedRun.operatorExecutionRecords ?? []).find((record) => record.idempotencyKey === execution.idempotencyKey);
+      if (existing) {
+        const updated = appendAudit(checkedRun, {
+          action: "operator.execution.idempotent-hit",
+          actor: "System",
+          summary: `Existing Phase 9 review-mode execution record returned for idempotency key ${existing.idempotencyKey}.`,
+          metadata: { executionId: existing.id, bridgeItemId: existing.bridgeItemId, state: existing.state, directExecutionEnabled: false, liveExecutionBlocked: true },
+        });
+        result = { run: normalizeRun(updated), execution: existing, idempotent: true, adapter };
+        return result.run;
+      }
+      const updated = appendAudit(normalizeRun({ ...checkedRun, operatorExecutionRecords: [execution, ...(checkedRun.operatorExecutionRecords ?? [])] }), {
+        action: execution.state === "blocked" ? "operator.execution.blocked" : "operator.execution.queued",
+        actor: parsed.actor,
+        summary: execution.state === "blocked"
+          ? "Phase 9 OpenClaw/operator execution record was blocked before queueing; no external side effects occurred."
+          : "Phase 9 OpenClaw/operator execution record queued in review mode with copyable packet only; no external side effects occurred.",
+        metadata: { executionId: execution.id, bridgeItemId: execution.bridgeItemId, handoffId: execution.handoffId, directExecutionEnabled: false, liveExecutionBlocked: true },
+      });
+      result = { run: normalizeRun(updated), execution, idempotent: false, adapter };
+      return result.run;
+    }
+
+    const execution = (checkedRun.operatorExecutionRecords ?? []).find((record) => record.id === parsed.executionId || record.bridgeItemId === parsed.bridgeItemId || record.handoffId === parsed.handoffId) ?? checkedRun.operatorExecutionRecords?.[0];
+    if (!execution) {
+      throw new Error("No Phase 9 operator execution record exists to update. Queue review-mode execution first.");
+    }
+    const transitioned = transitionOperatorExecutionRecord(execution, {
+      action: action as Exclude<OperatorExecutionAction, "queue">,
+      actor: parsed.actor,
+      operatorTarget: parsed.operatorTarget,
+      resultSummary: parsed.resultSummary,
+      blockedReason: parsed.blockedReason,
+    });
+    const operatorExecutionRecords = (checkedRun.operatorExecutionRecords ?? []).map((record) => record.id === execution.id ? transitioned : record);
+    const actionMap: Record<Exclude<OperatorExecutionAction, "queue">, NonNullable<FactoryRun["auditTrail"]>[number]["action"]> = {
+      "start-review": "operator.execution.running-review",
+      "complete-review": "operator.execution.completed-review",
+      block: "operator.execution.blocked",
+      cancel: "operator.execution.cancelled",
+      fail: "operator.execution.failed",
+    };
+    const updated = appendAudit(normalizeRun({ ...checkedRun, operatorExecutionRecords }), {
+      action: actionMap[action as Exclude<OperatorExecutionAction, "queue">],
+      actor: parsed.actor,
+      summary: `Phase 9 operator execution record ${action} recorded as ${transitioned.state}; Mission Control performed no external side effects.`,
+      metadata: { executionId: transitioned.id, bridgeItemId: transitioned.bridgeItemId, handoffId: transitioned.handoffId, state: transitioned.state, directExecutionEnabled: false, liveExecutionBlocked: true },
+    });
+    result = { run: normalizeRun(updated), execution: transitioned, idempotent: false, adapter };
     return result.run;
   });
 
