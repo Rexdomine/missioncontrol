@@ -87,6 +87,20 @@ Security notes:
 
 Phase 1 of the Agent OS is intentionally frontend-first. It establishes the operating model, typed seed data, and reviewable UI surfaces before replacing the static data with real telemetry from sessions, commands, memory, tools, GitHub, and scheduler state.
 
+## Software Development Factory Phase 10
+
+SDF Phase 10 adds the secure contract and guarded foundation for future real review-mode OpenClaw sessions execution:
+
+- typed `OpenClawSessionsBridgeRequest` / `OpenClawSessionsBridgeResponse` contract
+- server-only readiness/config helper at `lib/sdf/openclaw-sessions-bridge.ts`
+- disabled-by-default live bridge env boundary: `SDF_OPENCLAW_BRIDGE_ENABLED`, endpoint, token, and contract version
+- allowlisted target validation for Thor review-mode on the Mission Control repo path
+- idempotent dry-run/live submission attempts attached to Phase 9 execution records
+- `POST /api/sdf/runs/[id]/operator-bridge/execute/submit` for dry-run submission and blocked live submission
+- UI visibility for readiness, env/config status, target allowlist, submission attempts, audit event id, blockers, and next action
+
+Phase 10 does not fake direct execution. Dry-run submission records audit and idempotency; live submit stays blocked until Rex approves a safe OpenClaw sessions API client and least-privilege credential boundary. See `docs/sdf-phase10.md` for the contract, env vars, allowlist, idempotency, audit model, and Phase 11 checklist.
+
 ## Software Development Factory Phase 9
 
 SDF Phase 9 connects the Phase 8 OpenClaw/operator outbox to a safe review-mode execution bridge:

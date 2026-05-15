@@ -6,8 +6,10 @@ import { chooseLaunchQueueState, deriveLaunchIdempotencyKey, evaluateApprovalPol
 import { buildDispatchPlan, createDispatchAttempt, createThorReviewHandoff, findDispatchableJob, getDispatcherReadiness } from "./dispatcher";
 import { getGitHubLiveReadiness, readGitHubCheckpoint } from "./github";
 import { buildOperatorExecutionRecord, getOpenClawExecutionAdapterReadiness, transitionOperatorExecutionRecord } from "./openclaw-execution-adapter";
+import { buildOpenClawSessionSubmissionIdempotencyKey, getOpenClawSessionsBridgeReadiness, validateOpenClawSessionsBridgeRequest } from "./openclaw-sessions-bridge";
+import { OPENCLAW_SESSIONS_BRIDGE_SCHEMA_VERSION } from "./openclaw-sessions-contract";
 import { buildOperatorBridgeOutboxItem, transitionOperatorBridgeItem } from "./operator-bridge";
-import type { BuildIntake, DispatchAttempt, DispatchMode, FactoryRun, FactoryRunState, LaunchApprovalState, LaunchQueueJob, OperatorBridgeAction, OperatorBridgeOutboxItem, OperatorExecutionAction, OperatorExecutionRecord, SdfRunRegistryResponse } from "./types";
+import type { BuildIntake, DispatchAttempt, DispatchMode, FactoryRun, FactoryRunState, LaunchApprovalState, LaunchQueueJob, OpenClawSessionsBridgeRequest, OpenClawSessionsBridgeSubmissionAttempt, OperatorBridgeAction, OperatorBridgeOutboxItem, OperatorExecutionAction, OperatorExecutionRecord, SdfRunRegistryResponse } from "./types";
 
 const dataDir = process.env.SDF_DATA_DIR || path.join(process.cwd(), ".mission-control-data", "sdf");
 const dataFile = path.join(dataDir, "runs.json");
@@ -29,6 +31,13 @@ const approvalSchema = z.enum(["draft", "requested", "approved", "rejected", "la
 const dispatchModeSchema = z.enum(["dry-run", "review", "review-dispatch", "operator-handoff", "live"]);
 const operatorBridgeActionSchema = z.enum(["prepare", "claim", "start-review", "complete-review", "block", "cancel", "fail"]);
 const operatorExecutionActionSchema = z.enum(["queue", "start-review", "complete-review", "block", "cancel", "fail"]);
+const sessionsBridgeSubmissionActionSchema = z.enum(["dry-run", "submit"]);
+const sessionsBridgeApprovalProofSchema = z.object({
+  approvalIntent: z.enum(["rex-approved-review-dispatch"]),
+  approvedBy: z.enum(["Rex", "Thor", "System"]),
+  approvedAt: z.string().min(1),
+  approvalNote: z.string().optional(),
+});
 
 async function ensureStore() {
   await fs.mkdir(dataDir, { recursive: true });
@@ -47,7 +56,7 @@ function normalizeRun(run: FactoryRun): FactoryRun {
     approvalPolicy: run.approvalPolicy ?? defaultApprovalPolicy,
     dispatchAttempts: run.dispatchAttempts ?? [],
     operatorBridgeOutbox: run.operatorBridgeOutbox ?? [],
-    operatorExecutionRecords: run.operatorExecutionRecords ?? [],
+    operatorExecutionRecords: (run.operatorExecutionRecords ?? []).map((record) => ({ ...record, submissionAttempts: record.submissionAttempts ?? [] })),
     auditTrail: run.auditTrail ?? [],
     prCheckpoint: {
       ...run.prCheckpoint,
@@ -85,7 +94,7 @@ export function getSdfAdapter(): SdfRunRegistryResponse["adapter"] {
 }
 
 export async function listRuns(): Promise<SdfRunRegistryResponse> {
-  return { runs: await readRunsUnsafe(), adapter: getSdfAdapter(), dispatcher: getDispatcherReadiness(), executionAdapter: getOpenClawExecutionAdapterReadiness() };
+  return { runs: await readRunsUnsafe(), adapter: getSdfAdapter(), dispatcher: getDispatcherReadiness(), executionAdapter: getOpenClawExecutionAdapterReadiness(), sessionsBridge: getOpenClawSessionsBridgeReadiness() };
 }
 
 export async function getRun(id: string): Promise<FactoryRun | null> {
@@ -593,6 +602,129 @@ export async function updateOperatorExecutionRecord(id: string, body: unknown): 
       metadata: { executionId: transitioned.id, bridgeItemId: transitioned.bridgeItemId, handoffId: transitioned.handoffId, state: transitioned.state, directExecutionEnabled: false, liveExecutionBlocked: true },
     });
     result = { run: normalizeRun(updated), execution: transitioned, idempotent: false, adapter };
+    return result.run;
+  });
+
+  if (!result) return null;
+  await writeRuns(next);
+  return result;
+}
+
+export async function submitOpenClawSessionBridge(id: string, body: unknown): Promise<{ run: FactoryRun; execution: OperatorExecutionRecord; attempt: OpenClawSessionsBridgeSubmissionAttempt; idempotent: boolean; readiness: ReturnType<typeof getOpenClawSessionsBridgeReadiness> } | null> {
+  const parsed = z
+    .object({
+      action: sessionsBridgeSubmissionActionSchema.default("dry-run"),
+      executionId: z.string().optional(),
+      handoffId: z.string().optional(),
+      idempotencyKey: z.string().min(8).optional(),
+      target: z.object({
+        targetId: z.string().default("thor-review-mission-control"),
+        agentId: z.string().default("thor"),
+        operator: z.string().default("Thor"),
+        mode: z.enum(["review"]).default("review"),
+      }).default({ targetId: "thor-review-mission-control", agentId: "thor", operator: "Thor", mode: "review" }),
+      allowlistedRepoPath: z.string().default("/home/node/.openclaw/workspace/missioncontrol"),
+      approvalProof: sessionsBridgeApprovalProofSchema.optional(),
+      requestedBy: z.enum(["Rex", "Thor", "System"]).default("System"),
+      auditReason: z.string().default("Phase 10 review-mode sessions bridge submission request."),
+    })
+    .parse(body ?? {});
+
+  const readiness = getOpenClawSessionsBridgeReadiness();
+  const runs = await readRunsUnsafe();
+  let result: { run: FactoryRun; execution: OperatorExecutionRecord; attempt: OpenClawSessionsBridgeSubmissionAttempt; idempotent: boolean; readiness: ReturnType<typeof getOpenClawSessionsBridgeReadiness> } | null = null;
+
+  const next = runs.map((run) => {
+    if (run.id !== id) return run;
+    const checkedRun = normalizeRun({ ...run, updatedAt: nowIso() });
+    const execution = (checkedRun.operatorExecutionRecords ?? []).find((record) => record.id === parsed.executionId || record.handoffId === parsed.handoffId) ?? checkedRun.operatorExecutionRecords?.[0];
+    if (!execution) {
+      throw new Error("No Phase 9 operator execution record exists to submit. Queue review-mode execution first.");
+    }
+
+    const requestedIdempotencyKey = parsed.idempotencyKey ?? execution.idempotencyKey;
+    const submissionIdempotencyKey = buildOpenClawSessionSubmissionIdempotencyKey({ executionId: execution.id, handoffId: execution.handoffId, requestedKey: requestedIdempotencyKey, action: parsed.action });
+    const existing = (execution.submissionAttempts ?? []).find((attempt) => attempt.idempotencyKey === submissionIdempotencyKey);
+    if (existing) {
+      const updated = appendAudit(checkedRun, {
+        action: "operator.session-submission.idempotent-hit",
+        actor: "System",
+        summary: `Existing Phase 10 OpenClaw sessions bridge submission returned for idempotency key ${submissionIdempotencyKey}.`,
+        metadata: { executionId: execution.id, attemptId: existing.id, accepted: existing.accepted, blocked: existing.blocked },
+      });
+      result = { run: normalizeRun(updated), execution, attempt: { ...existing, idempotencyStatus: "replayed", response: { ...existing.response, idempotencyStatus: "replayed" } }, idempotent: true, readiness };
+      return result.run;
+    }
+
+    const auditEventId = generateId("operator-session-submission-audit");
+    const approvalProof = parsed.approvalProof;
+    const request: OpenClawSessionsBridgeRequest = {
+      schemaVersion: OPENCLAW_SESSIONS_BRIDGE_SCHEMA_VERSION,
+      runId: checkedRun.id,
+      executionId: execution.id,
+      handoffId: execution.handoffId,
+      idempotencyKey: requestedIdempotencyKey,
+      target: parsed.target,
+      taskPacket: execution.executionPacketSnapshot,
+      allowlistedRepoPath: parsed.allowlistedRepoPath,
+      approvalProof: approvalProof ?? { approvalIntent: "rex-approved-review-dispatch", approvedBy: parsed.requestedBy, approvedAt: nowIso(), approvalNote: "Missing approval proof supplied; this placeholder is immediately blocked and not trusted." },
+      auditContext: {
+        runTitle: checkedRun.title,
+        source: "mission-control-sdf",
+        requestedBy: parsed.requestedBy,
+        reason: parsed.auditReason,
+      },
+      createdAt: nowIso(),
+      requestedBy: parsed.requestedBy,
+    };
+
+    const validation = approvalProof ? validateOpenClawSessionsBridgeRequest(request, readiness) : { allowed: false, blockers: ["approvalProof with rex-approved-review-dispatch is required before bridge submission."], matchedTarget: undefined };
+    const liveBlockers = parsed.action === "submit" && !readiness.liveSubmissionReady ? readiness.blockers : [];
+    const blockers = [...validation.blockers, ...liveBlockers];
+    const accepted = parsed.action === "dry-run" && blockers.length === 0;
+    const response = {
+      schemaVersion: OPENCLAW_SESSIONS_BRIDGE_SCHEMA_VERSION,
+      accepted,
+      blocked: !accepted,
+      idempotencyStatus: "new" as const,
+      blockerReasons: blockers,
+      auditEventId,
+      nextAction: accepted ? "copy-packet-manually" as const : parsed.action === "submit" ? "configure-bridge" as const : "fix-request" as const,
+    };
+    const attempt: OpenClawSessionsBridgeSubmissionAttempt = {
+      id: `operator-session-submission-${submissionIdempotencyKey}`,
+      action: parsed.action,
+      idempotencyKey: submissionIdempotencyKey,
+      targetId: parsed.target.targetId,
+      operator: parsed.target.operator,
+      agentId: parsed.target.agentId,
+      mode: "review",
+      allowlistedRepoPath: parsed.allowlistedRepoPath,
+      dryRun: parsed.action === "dry-run",
+      accepted: response.accepted,
+      blocked: response.blocked,
+      idempotencyStatus: "new",
+      blockerReasons: response.blockerReasons,
+      auditEventId,
+      nextAction: response.nextAction,
+      request,
+      response,
+      createdAt: request.createdAt,
+      requestedBy: parsed.requestedBy,
+    };
+
+    const updatedExecution = { ...execution, submissionAttempts: [attempt, ...(execution.submissionAttempts ?? [])], updatedAt: nowIso() };
+    const operatorExecutionRecords = (checkedRun.operatorExecutionRecords ?? []).map((record) => record.id === execution.id ? updatedExecution : record);
+    const updated = appendAudit(normalizeRun({ ...checkedRun, operatorExecutionRecords }), {
+      id: auditEventId,
+      action: accepted ? "operator.session-submission.dry-run" : "operator.session-submission.blocked",
+      actor: parsed.requestedBy,
+      summary: accepted
+        ? "Phase 10 dry-run OpenClaw sessions bridge submission accepted and recorded; no live session was spawned."
+        : "Phase 10 OpenClaw sessions bridge submission blocked before any live side effect.",
+      metadata: { executionId: execution.id, attemptId: attempt.id, action: parsed.action, targetId: parsed.target.targetId, accepted, blocked: !accepted, liveSubmissionReady: readiness.liveSubmissionReady },
+    });
+    result = { run: normalizeRun(updated), execution: updatedExecution, attempt, idempotent: false, readiness };
     return result.run;
   });
 
